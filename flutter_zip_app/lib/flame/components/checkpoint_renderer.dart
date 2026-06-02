@@ -30,26 +30,53 @@ class CheckpointRenderer extends PositionComponent {
     for (final clue in clueNumbers) {
       final centerX = (clue.x * cellSize) + (cellSize / 2);
       final centerY = (clue.y * cellSize) + (cellSize / 2);
+      final center = Offset(centerX, centerY);
+      final radius = cellSize * 0.28; // Reduced from 0.35 to 0.28
 
-      // Draw circle background - BLACK
+      // Subtle outer glow ring (dark to make white circle pop)
+      final outerGlowPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.3)
+        ..style = PaintingStyle.fill
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawCircle(center, radius * 1.3, outerGlowPaint);
+
+      // Main circle background - WHITE
       final circlePaint = Paint()
-        ..color = Colors.black
+        ..color = Colors.white
         ..style = PaintingStyle.fill;
+      canvas.drawCircle(center, radius, circlePaint);
 
-      canvas.drawCircle(
-        Offset(centerX, centerY),
-        cellSize * 0.35,
-        circlePaint,
-      );
+      // Subtle shadow border
+      final borderShadowPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.15)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+      canvas.drawCircle(center, radius, borderShadowPaint);
 
-      // Draw number - WHITE text
+      // Clean border
+      final borderPaint = Paint()
+        ..color = Colors.black.withValues(alpha: 0.2)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(center, radius, borderPaint);
+
+      // Draw number - BLACK text
       final textPainter = TextPainter(
         text: TextSpan(
           text: '${clue.num}',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: cellSize * 0.4,
-            fontWeight: FontWeight.bold,
+            color: Colors.black,
+            fontSize: cellSize * 0.32, // Reduced from 0.4 to 0.32
+            fontWeight: FontWeight.w900,
+            fontFamily: 'Poppins',
+            shadows: [
+              Shadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 1,
+                offset: const Offset(0, 0.5),
+              ),
+            ],
           ),
         ),
         textDirection: TextDirection.ltr,

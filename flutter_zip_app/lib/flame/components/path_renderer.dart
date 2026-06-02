@@ -102,6 +102,7 @@ class PathRenderer extends PositionComponent {
       return;
     }
 
+    // Main path with brighter, more saturated color
     final paint = Paint()
       ..color = pathColor // Random VIBGYOR color
       ..style = PaintingStyle.stroke
@@ -111,35 +112,46 @@ class PathRenderer extends PositionComponent {
 
     final path = _createSmoothPath();
     canvas.drawPath(path, paint);
+    
+    // Add subtle white highlight on top for extra pop
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = pathWidth * 0.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    
+    canvas.drawPath(path, highlightPaint);
   }
 
   void _drawGlowEffect(Canvas canvas) {
     if (_path.isEmpty) return;
     if (_path.length == 1 && _currentDragPosition == null) return;
 
-    // Animated glow intensity
-    final glowIntensity = 0.2 + (math.sin(_glowPhase) * 0.1);
-
-    // Outer glow - same color as path
-    final outerGlowPaint = Paint()
-      ..color = pathColor.withValues(alpha: glowIntensity)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = pathWidth * 2.0
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    // Animated glow intensity (subtle)
+    final glowIntensity = 0.15 + (math.sin(_glowPhase) * 0.08);
 
     final path = _createSmoothPath();
+
+    // Outer glow - reduced blur and opacity
+    final outerGlowPaint = Paint()
+      ..color = pathColor.withValues(alpha: glowIntensity * 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = pathWidth * 1.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
     canvas.drawPath(path, outerGlowPaint);
 
-    // Inner glow - same color as path
+    // Inner glow - tighter and more subtle
     final innerGlowPaint = Paint()
-      ..color = pathColor.withValues(alpha: 0.4)
+      ..color = pathColor.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = pathWidth * 1.3
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
 
     canvas.drawPath(path, innerGlowPaint);
   }
@@ -193,20 +205,24 @@ class PathRenderer extends PositionComponent {
   void _drawSinglePoint(Canvas canvas, GridCell cell) {
     final center = _getCellCenter(cell);
 
+    // Reduced outer glow
+    final outerGlowPaint = Paint()
+      ..color = pathColor.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawCircle(center, pathWidth * 0.9, outerGlowPaint);
+
     // Main point - random VIBGYOR color
     final paint = Paint()
       ..color = pathColor
       ..style = PaintingStyle.fill;
-
     canvas.drawCircle(center, pathWidth / 2, paint);
 
-    // Glow effect - same color
-    final glowPaint = Paint()
-      ..color = pathColor.withValues(alpha: 0.3)
-      ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-
-    canvas.drawCircle(center, pathWidth * 0.75, glowPaint);
+    // Small white highlight
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, pathWidth / 4, highlightPaint);
   }
 
   Offset _getCellCenter(GridCell cell) {

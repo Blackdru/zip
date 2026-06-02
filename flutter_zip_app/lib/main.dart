@@ -22,7 +22,7 @@ void main() async {
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: AppTheme.backgroundDark,
+      systemNavigationBarColor: AppTheme.canvas,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );

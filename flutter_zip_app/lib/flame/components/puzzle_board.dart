@@ -50,32 +50,99 @@ class PuzzleBoard extends PositionComponent with HasGameRef {
   }
 
   void _drawObstacles(Canvas canvas) {
-    final paint = Paint()
-      ..color = const Color(0xFF424242)
-      ..style = PaintingStyle.fill;
-
-    const obstaclePadding = 4.0;
-
+    // Enhanced obstacles with glow
     for (final obstacle in obstacles) {
+      const obstaclePadding = 4.0;
+      
       final rect = Rect.fromLTWH(
         (obstacle.x * cellSize) + obstaclePadding,
         (obstacle.y * cellSize) + obstaclePadding,
         cellSize - (obstaclePadding * 2),
         cellSize - (obstaclePadding * 2),
       );
-      canvas.drawRect(rect, paint);
+      
+      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+      
+      // Outer glow
+      final glowPaint = Paint()
+        ..color = const Color(0xFF1A0B2E).withValues(alpha: 0.8)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+      canvas.drawRRect(rrect, glowPaint);
+      
+      // Dark gradient fill
+      final gradientPaint = Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1A0B2E), // Deep purple
+            Color(0xFF0A0515), // Almost black
+          ],
+        ).createShader(rect);
+      
+      canvas.drawRRect(rrect, gradientPaint);
+      
+      // Bright border with subtle glow
+      final borderGlowPaint = Paint()
+        ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawRRect(rrect, borderGlowPaint);
+      
+      // Solid border
+      final borderPaint = Paint()
+        ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      canvas.drawRRect(rrect, borderPaint);
     }
   }
 
   void _drawGrid(Canvas canvas) {
-    final paint = Paint()
-      ..color = const Color(0xFF424242) // Dark grey
+    // Draw cell backgrounds with subtle gradient
+    for (int row = 0; row < gridSize; row++) {
+      for (int col = 0; col < gridSize; col++) {
+        final rect = Rect.fromLTWH(
+          col * cellSize,
+          row * cellSize,
+          cellSize,
+          cellSize,
+        );
+        
+        // Gradient background for each cell
+        final gradientPaint = Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF2D1B4E).withValues(alpha: 0.4), // Rich purple
+              const Color(0xFF1A0B2E).withValues(alpha: 0.3), // Deep purple
+            ],
+          ).createShader(rect);
+        
+        final cellRRect = RRect.fromRectAndRadius(
+          rect,
+          const Radius.circular(8.0),
+        );
+        
+        canvas.drawRRect(cellRRect, gradientPaint);
+      }
+    }
+    
+    // Draw glowing borders (subtle)
+    final glowPaint = Paint()
+      ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.2) // Reduced glow
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0; // Slightly thicker for visibility
+      ..strokeWidth = 2.0
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    
+    final borderPaint = Paint()
+      ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.5) // Slightly reduced
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
 
-    const cornerRadius = 8.0; // Rounded corners
-
-    // Draw cells with rounded corners
+    // Draw cell borders with glow
     for (int row = 0; row < gridSize; row++) {
       for (int col = 0; col < gridSize; col++) {
         final rect = RRect.fromRectAndRadius(
@@ -85,9 +152,13 @@ class PuzzleBoard extends PositionComponent with HasGameRef {
             cellSize,
             cellSize,
           ),
-          const Radius.circular(cornerRadius),
+          const Radius.circular(8.0),
         );
-        canvas.drawRRect(rect, paint);
+        
+        // Glow layer
+        canvas.drawRRect(rect, glowPaint);
+        // Solid border
+        canvas.drawRRect(rect, borderPaint);
       }
     }
   }

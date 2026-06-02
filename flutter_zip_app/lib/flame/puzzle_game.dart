@@ -37,7 +37,7 @@ class PuzzleGame extends FlameGame {
   });
 
   @override
-  Color backgroundColor() => const Color(0xFFF5F5F5);
+  Color backgroundColor() => const Color(0xFF0F0A1E); // Dark theme background
 
   @override
   Future<void> onLoad() async {
@@ -244,16 +244,16 @@ class _HintOverlayComponent extends PositionComponent {
     final alpha = (0.25 + _pulseT * 0.40).clamp(0.0, 1.0);
     final rect = Rect.fromLTWH(0, 0, cellSize, cellSize);
 
-    // Filled overlay
-    canvas.drawRect(
-      rect,
-      Paint()..color = const Color(0xFFE8500A).withOpacity(alpha),
+    // Filled overlay with warm orange (hint color)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
+      Paint()..color = const Color(0xFFFF8C42).withValues(alpha: alpha), // Warm orange
     );
     // Solid border
-    canvas.drawRect(
-      rect,
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(6)),
       Paint()
-        ..color = const Color(0xFFE8500A)
+        ..color = const Color(0xFFFF8C42) // Warm orange
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5,
     );

@@ -27,7 +27,7 @@ class SubmitResult {
   }
 }
 
-/// Result of a practice puzzle request — puzzle data AND solution path for hints
+/// Result of an unlimited puzzle request — puzzle data AND solution path for hints
 class PracticePuzzleResult {
   final PuzzleData puzzle;
   final List<SolutionStep> solutionPath;
@@ -74,7 +74,7 @@ class PuzzleService {
     }
   }
 
-  /// Get a practice puzzle — returns puzzle data AND solution path for hints
+  /// Get an unlimited puzzle — returns puzzle data AND solution path for hints
   Future<PracticePuzzleResult> getPracticePuzzle({
     required Difficulty difficulty,
     required int sequence,

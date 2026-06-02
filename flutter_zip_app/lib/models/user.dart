@@ -24,30 +24,14 @@ class User with _$User {
 class UserStats with _$UserStats {
   const factory UserStats({
     required String userId,
-    @Default(0) int tournamentsPlayed,
-    @Default(0) int tournamentsWon,
-    int? bestFinish,
-    int? fastestSolveMs,
     @Default(0) int totalPuzzlesSolved,
     @Default(0) int practiceCount,
     @Default(0) int currentStreak,
     @Default(0) int longestStreak,
     int? averageSolveMs,
+    int? fastestSolveMs,
   }) = _UserStats;
 
   factory UserStats.fromJson(Map<String, dynamic> json) =>
       _$UserStatsFromJson(json);
-}
-
-/// Represents authentication response
-@freezed
-class AuthResponse with _$AuthResponse {
-  const factory AuthResponse({
-    required String accessToken,
-    required String refreshToken,
-    required User user,
-  }) = _AuthResponse;
-
-  factory AuthResponse.fromJson(Map<String, dynamic> json) =>
-      _$AuthResponseFromJson(json);
 }

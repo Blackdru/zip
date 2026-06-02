@@ -10,7 +10,7 @@ class PuzzleState {
   final bool isLoading;
   final String? error;
   final SubmitResult? lastResult;
-  /// Solution path for practice puzzles — used for reveal-next-step hints
+  /// Solution path for unlimited puzzles — used for reveal-next-step hints
   final List<SolutionStep> practiceSolutionPath;
 
   const PuzzleState({
