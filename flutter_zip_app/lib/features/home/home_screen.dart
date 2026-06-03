@@ -82,7 +82,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   
                   // Subtitle
                   Text(
-                    'Connect the dots. Fill the grid.\nChallenge your mind.',
+                    'Connect the checkpoints. Fill the grid.\nChallenge your mind.',
                     style: TextStyle(
                       fontSize: 16,
                       color: AppTheme.inkLight.withValues(alpha: 0.8),
@@ -92,10 +92,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   
                   const SizedBox(height: 50),
                   
+                  // App icon/logo
+                  Center(
+                    child: Container(
+                      width: 300,
+                      height: 200,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(32),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color.fromARGB(255, 0, 0, 0).withValues(alpha: 0.1),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(32),
+                        child: Image.asset(
+                          'assets/images/app_icon.png',
+                          width: 140,
+                          height: 140,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  
                   // Main play button with animation
                   _buildPlayButton(),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 50),
                   
                   // Stats cards
                   _buildStatsCards(),
@@ -118,13 +145,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ShaderMask(
           shaderCallback: (bounds) => AppTheme.neonGradient.createShader(bounds),
           child: const Text(
-            'ZIP',
+            'PATH PUZZLE',
             style: TextStyle(
               fontFamily: 'Poppins',
-              fontSize: 36,
+              fontSize: 28,
               fontWeight: FontWeight.w900,
               color: Colors.white,
-              letterSpacing: -1.5,
+              letterSpacing: -1,
             ),
           ),
         ),
@@ -201,13 +228,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             onTap: () => context.push(AppRoutes.practice),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 28),
+              height: 100,
+              padding: const EdgeInsets.symmetric(vertical: 13),
               decoration: BoxDecoration(
                 gradient: AppTheme.neonGradient,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.vibrantPurple.withValues(alpha: 0.5 * _pulseAnimation.value),
+                    color: AppTheme.vibrantPurple.withValues(alpha: 0.1 * _pulseAnimation.value),
                     blurRadius: 30 * _pulseAnimation.value,
                     spreadRadius: 5,
                   ),
@@ -243,7 +271,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 2),
                   Text(
                     'Endless Fun Awaits',
                     style: TextStyle(
@@ -264,83 +292,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildStatsCards() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Expanded(
-          child: _buildStatCard(
-            icon: Icons.grid_4x4_rounded,
-            label: 'DIFFICULTY',
-            value: 'EASY→HARD',
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.electricBlue.withValues(alpha: 0.2),
-                AppTheme.vibrantPurple.withValues(alpha: 0.1),
-              ],
-            ),
-            borderColor: AppTheme.electricBlue,
-          ),
+        _buildStatInfo(
+          icon: Icons.grid_4x4_rounded,
+          label: 'DIFFICULTY',
+          value: 'EASY→HARD',
+          color: AppTheme.electricBlue,
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildStatCard(
-            icon: Icons.emoji_events_rounded,
-            label: 'CHALLENGE',
-            value: 'YOURSELF',
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.neonGreen.withValues(alpha: 0.2),
-                AppTheme.electricBlue.withValues(alpha: 0.1),
-              ],
-            ),
-            borderColor: AppTheme.neonGreen,
-          ),
+        const SizedBox(width: 48),
+        _buildStatInfo(
+          icon: Icons.emoji_events_rounded,
+          label: 'CHALLENGE',
+          value: 'YOURSELF',
+          color: AppTheme.neonGreen,
         ),
       ],
     );
   }
 
-  Widget _buildStatCard({
+  Widget _buildStatInfo({
     required IconData icon,
     required String label,
     required String value,
-    required LinearGradient gradient,
-    required Color borderColor,
+    required Color color,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: borderColor.withValues(alpha: 0.3),
-          width: 2,
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: color.withValues(alpha: 0.7),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.inkLight.withValues(alpha: 0.6),
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 28, color: borderColor),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.inkLight.withValues(alpha: 0.7),
-              letterSpacing: 1,
-            ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.ink.withValues(alpha: 0.85),
+            letterSpacing: -0.3,
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.ink,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

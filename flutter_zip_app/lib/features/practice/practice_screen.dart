@@ -78,7 +78,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
           GestureDetector(
             onTap: _showHowToPlay,
             child: Container(
-              margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+              margin: const EdgeInsets.only(right: 16, top: 2, bottom: 2),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -181,6 +181,29 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                   
                   const SizedBox(height: 40),
                   
+                  // Mode info header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.shuffle_rounded,
+                        size: 20,
+                        color: AppTheme.vibrantPurple.withValues(alpha: 0.8),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'RANDOMLY GENERATED FROM 3 MODES',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.inkLight.withValues(alpha: 0.7),
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
                   // Difficulty cards
                   _buildDifficultyCards(),
                   
@@ -247,57 +270,44 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
   Widget _buildDifficultyCards() {
     final difficulties = [
       (
-        'EASY',
-        '5×5',
+        'Easy',
+        '5×5 grid',
         '5-6 checkpoints',
         AppTheme.neonGreen,
-        Icons.sentiment_satisfied_alt_rounded
       ),
       (
-        'MEDIUM',
-        '6×6',
+        'Medium',
+        '6×6 grid',
         '7-9 checkpoints',
         const Color.fromARGB(255, 235, 160, 23),
-        Icons.sentiment_neutral_rounded
       ),
       (
-        'HARD',
-        '7×7',
+        'Hard',
+        '7×7 grid',
         '10-12 checkpoints',
         const Color.fromARGB(255, 161, 7, 7),
-        Icons.sentiment_very_dissatisfied_rounded
       ),
     ];
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: difficulties.map((diff) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                diff.$4.withValues(alpha: 0.15),
-                diff.$4.withValues(alpha: 0.05),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: diff.$4.withValues(alpha: 0.3),
-              width: 2,
-            ),
-          ),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Simple colored dot indicator
               Container(
-                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(top: 4),
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
-                  color: diff.$4.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(14),
+                  color: diff.$4.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
                 ),
-                child: Icon(diff.$5, size: 28, color: diff.$4),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,33 +315,21 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                     Text(
                       diff.$1,
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: diff.$4,
-                        letterSpacing: 0.5,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.ink.withValues(alpha: 0.9),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     Text(
                       '${diff.$2} • ${diff.$3}',
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppTheme.inkLight.withValues(alpha: 0.8),
+                        color: AppTheme.inkLight.withValues(alpha: 0.65),
+                        height: 1.4,
                       ),
                     ),
                   ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: diff.$4.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 20,
-                  color: diff.$4,
                 ),
               ),
             ],

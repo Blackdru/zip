@@ -81,11 +81,12 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        duration: const Duration(seconds: 5),
         content: const Text(
-          'Dead end — no valid moves left. Backtrack or reset.',
-          style: TextStyle(fontWeight: FontWeight.w500),
+          'Wrong Turn — Move back and take a Hint or restart',
+          style:  TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
         ),
-        backgroundColor: const Color(0xFFB91C1C),
+        backgroundColor: const Color.fromARGB(255, 196, 10, 10),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -234,23 +235,23 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppTheme.neonGreen.withValues(alpha: 0.3),
-                      AppTheme.electricBlue.withValues(alpha: 0.2),
+                      AppTheme.neonGreen.withValues(alpha: 0.1),
+                      AppTheme.electricBlue.withValues(alpha: 0.1),
                     ],
                   ),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.neonGreen.withValues(alpha: 0.5),
-                      blurRadius: 30,
-                      spreadRadius: 5,
+                      color: AppTheme.neonGreen.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      spreadRadius: 2,
                     ),
                   ],
                 ),
                 child: const Icon(
                   Icons.check_circle_rounded,
                   size: 64,
-                  color: AppTheme.neonGreen,
+                  color: Color.fromARGB(255, 17, 221, 105),
                 ),
               ),
               
@@ -260,7 +261,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                 shaderCallback: (bounds) =>
                     AppTheme.successGradient.createShader(bounds),
                 child: const Text(
-                  'PUZZLE COMPLETE!',
+                  'Excellent !',
                   style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 28,
@@ -317,8 +318,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
               
               Text(
                 widget.isPractice
-                    ? '🎉 Excellent work! Keep the momentum going!'
-                    : '✨ Solution submitted successfully!',
+                    ? ''
+                    : ' Solution submitted successfully!',
                 style: TextStyle(
                   fontSize: 15,
                   color: AppTheme.inkLight.withValues(alpha: 0.9),
@@ -412,7 +413,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                       ),
                     ),
                     child: const Text(
-                      'BACK TO MENU',
+                      'BACK',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -488,7 +489,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
             GestureDetector(
               onTap: _showHint,
               child: Container(
-                margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                margin: const EdgeInsets.only(right: 8, top: 2, bottom: 2),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -546,7 +547,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                 Future.microtask(() => _game?.startPuzzle());
               },
               child: Container(
-                margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+                margin: const EdgeInsets.only(right: 16, top: 2, bottom: 2),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -763,6 +764,10 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   @override
   void dispose() {
     _isTimerRunning = false;
+    // Clear any snackbars when leaving the puzzle screen
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+    }
     super.dispose();
   }
 }

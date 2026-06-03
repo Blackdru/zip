@@ -128,7 +128,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Made with ❤️ for puzzle lovers',
+                        'Made by Budrock Technologies',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppTheme.inkLight.withValues(alpha: 0.6),
