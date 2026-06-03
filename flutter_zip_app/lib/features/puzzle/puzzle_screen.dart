@@ -7,6 +7,8 @@ import '../../flame/puzzle_game.dart';
 import '../../models/puzzle.dart';
 import '../../models/grid_cell.dart';
 import '../../providers/puzzle_provider.dart';
+import '../../services/ad_service.dart';
+import '../../widgets/banner_ad_widget.dart';
 
 class PuzzleScreen extends ConsumerStatefulWidget {
   final String? puzzleId;
@@ -140,6 +142,9 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
           );
     }
 
+    // Show interstitial ad after every 3-4 games
+    AdService().onPuzzleCompleted();
+
     if (mounted) {
       _showCompletionDialog(displayTimeMs); // correct elapsed time for display
     }
@@ -199,7 +204,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
         child: Container(
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
@@ -242,7 +247,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     ),
                   ],
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.check_circle_rounded,
                   size: 64,
                   color: AppTheme.neonGreen,
@@ -288,7 +293,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.timer_rounded,
                       color: AppTheme.electricBlue,
                       size: 32,
@@ -514,7 +519,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                       color: _hintActive ? AppTheme.warmOrange : AppTheme.electricBlue,
                     ),
                     const SizedBox(width: 6),
-                    Text(
+                    const Text(
                       'Hint',
                       style: TextStyle(
                         fontSize: 13,
@@ -556,7 +561,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     width: 2,
                   ),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
@@ -564,8 +569,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                       size: 16,
                       color: AppTheme.neonPink,
                     ),
-                    const SizedBox(width: 6),
-                    const Text(
+                    SizedBox(width: 6),
+                    Text(
                       'Reset',
                       style: TextStyle(
                         fontSize: 13,
@@ -610,6 +615,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                             ),
                           ),
                         ),
+                        // Banner Ad at the bottom
+                        const BannerAdWidget(),
                       ],
                     ),
     );
@@ -663,7 +670,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
           _infoCell(
             Icons.grid_4x4_rounded,
             'GRID',
-            '${gridSize}×$gridSize',
+            '$gridSize×$gridSize',
             AppTheme.neonPink,
           ),
         ],

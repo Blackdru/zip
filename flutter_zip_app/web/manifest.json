@@ -1,11 +1,11 @@
 {
-    "name": "flutter_zip_app",
-    "short_name": "flutter_zip_app",
+    "name": "Path Puzzle",
+    "short_name": "Path Puzzle",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1e1e3c",
+    "theme_color": "#1e1e3c",
+    "description": "A premium competitive puzzle game",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

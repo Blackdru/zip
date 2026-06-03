@@ -13,6 +13,7 @@ import puzzleRoutes from './api/puzzles/puzzles.routes';
 import leaderboardRoutes from './api/leaderboard/leaderboard.routes';
 import statsRoutes from './api/stats/stats.routes';
 import antiCheatRoutes from './api/anticheat/anticheat.routes';
+import connectDotsRoutes from './api/connectdots/connectdots.routes';
 
 const app = express();
 
@@ -20,7 +21,20 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || config.cors.allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    
+    // In development, allow all origins
+    if (config.env === 'development') {
+      callback(null, true);
+      return;
+    }
+    
+    // In production, check against allowed origins
+    if (config.cors.allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('CORS: Not allowed'));
@@ -49,6 +63,7 @@ app.use('/api/v1/puzzles', puzzleRoutes);
 app.use('/api/v1/leaderboard', leaderboardRoutes);
 app.use('/api/v1/stats', statsRoutes);
 app.use('/api/v1/anticheat', antiCheatRoutes);
+app.use('/api/v1/connectdots', connectDotsRoutes);
 
 // ─── Error Handling ─────────────────────────────────────────────────────────
 app.use(notFoundHandler);

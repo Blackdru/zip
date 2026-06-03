@@ -1,12 +1,10 @@
-import 'dart:ui';
 import 'dart:math' as math;
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart' hide Image;
 import '../../models/grid_cell.dart';
 
-/// Renders the path drawn by the user with premium visual effects
-/// Uses smooth Catmull-Rom splines for elegant curves
-/// Path is centered and takes 35-50% of cell width
+/// Renders the path with thick rounded lines and gradient colors
+/// Matches the premium visual style from the reference design
 class PathRenderer extends PositionComponent {
   final int gridSize;
   final double cellSize;
@@ -14,37 +12,14 @@ class PathRenderer extends PositionComponent {
   List<GridCell> _path = [];
   Vector2? _currentDragPosition;
 
-  // Path width is 40% of cell size for centered routing
+  // Thick path width (about 20% of cell size for prominent visibility)
   late double pathWidth;
-  
-  // Animation for glow effect
-  double _glowPhase = 0.0;
-
-  // Random VIBGYOR color for each puzzle
-  late Color pathColor;
 
   PathRenderer({
     required this.gridSize,
     required this.cellSize,
   }) {
-    pathWidth = cellSize * 0.4;
-    // Generate random VIBGYOR color
-    pathColor = _getRandomVIBGYORColor();
-  }
-
-  /// Get random color from VIBGYOR spectrum
-  Color _getRandomVIBGYORColor() {
-    final random = math.Random();
-    final vibgyorColors = [
-      const Color(0xFF9400D3), // Violet
-      const Color(0xFF4B0082), // Indigo
-      const Color(0xFF0000FF), // Blue
-      const Color(0xFF00FF00), // Green
-      const Color(0xFFFFFF00), // Yellow
-      const Color(0xFFFF7F00), // Orange
-      const Color(0xFFFF0000), // Red
-    ];
-    return vibgyorColors[random.nextInt(vibgyorColors.length)];
+    pathWidth = cellSize * 0.38; // Further increased path width for prominence
   }
 
   @override
@@ -53,19 +28,11 @@ class PathRenderer extends PositionComponent {
     size = Vector2(cellSize * gridSize, cellSize * gridSize);
   }
 
-  @override
-  void update(double dt) {
-    super.update(dt);
-    // Animate glow effect
-    _glowPhase = (_glowPhase + dt * 2) % (2 * math.pi);
-  }
-
   void updatePath(List<GridCell> path, {Vector2? dragPosition}) {
-    // Only update if path or drag position actually changed
     if (_path.length != path.length || 
         _currentDragPosition != dragPosition ||
         !_pathsEqual(_path, path)) {
-      _path = List.from(path); // Create a copy to avoid reference issues
+      _path = List.from(path);
       _currentDragPosition = dragPosition;
     }
   }
@@ -89,7 +56,6 @@ class PathRenderer extends PositionComponent {
 
     if (_path.isEmpty) return;
 
-    _drawGlowEffect(canvas);
     _drawPath(canvas);
   }
 
@@ -97,132 +63,130 @@ class PathRenderer extends PositionComponent {
     if (_path.isEmpty) return;
 
     if (_path.length == 1 && _currentDragPosition == null) {
-      // Draw single point
       _drawSinglePoint(canvas, _path.first);
       return;
     }
 
-    // Main path with brighter, more saturated color
-    final paint = Paint()
-      ..color = pathColor // Random VIBGYOR color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = pathWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = _createSmoothPath();
-    canvas.drawPath(path, paint);
-    
-    // Add subtle white highlight on top for extra pop
-    final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = pathWidth * 0.5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    
-    canvas.drawPath(path, highlightPaint);
-  }
-
-  void _drawGlowEffect(Canvas canvas) {
-    if (_path.isEmpty) return;
-    if (_path.length == 1 && _currentDragPosition == null) return;
-
-    // Animated glow intensity (subtle)
-    final glowIntensity = 0.15 + (math.sin(_glowPhase) * 0.08);
-
-    final path = _createSmoothPath();
-
-    // Outer glow - reduced blur and opacity
-    final outerGlowPaint = Paint()
-      ..color = pathColor.withValues(alpha: glowIntensity * 0.6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = pathWidth * 1.8
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-
-    canvas.drawPath(path, outerGlowPaint);
-
-    // Inner glow - tighter and more subtle
-    final innerGlowPaint = Paint()
-      ..color = pathColor.withValues(alpha: 0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = pathWidth * 1.3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-
-    canvas.drawPath(path, innerGlowPaint);
-  }
-
-  /// Creates straight orthogonal path (horizontal/vertical lines only)
-  Path _createSmoothPath() {
-    final path = Path();
-    
-    if (_path.isEmpty) return path;
-
     // Convert grid cells to screen positions
     final points = _path.map((cell) => _getCellCenter(cell)).toList();
     
-    // Add drag position if available (snapped to last cell's axis and clamped to bounds)
+    // Add drag position if available (snapped to axis)
     if (_currentDragPosition != null && points.isNotEmpty) {
       final lastPoint = points.last;
-      
-      // Clamp drag position to grid bounds
       final clampedX = _currentDragPosition!.x.clamp(0.0, cellSize * gridSize);
       final clampedY = _currentDragPosition!.y.clamp(0.0, cellSize * gridSize);
       final dragOffset = Offset(clampedX, clampedY);
       
-      // Snap drag position to horizontal or vertical axis
       final dx = (dragOffset.dx - lastPoint.dx).abs();
       final dy = (dragOffset.dy - lastPoint.dy).abs();
       
       if (dx > dy) {
-        // Horizontal movement
         points.add(Offset(dragOffset.dx, lastPoint.dy));
       } else {
-        // Vertical movement
         points.add(Offset(lastPoint.dx, dragOffset.dy));
       }
     }
 
     if (points.length == 1) {
-      path.addOval(Rect.fromCircle(center: points[0], radius: pathWidth / 2));
-      return path;
+      _drawSinglePoint(canvas, _path.first);
+      return;
     }
 
-    // Draw straight lines between points
-    path.moveTo(points[0].dx, points[0].dy);
+    // Draw path segments with gradient colors
+    _drawSegmentedPath(canvas, points);
+  }
+
+  void _drawSegmentedPath(Canvas canvas, List<Offset> points) {
+    // Gradient colors matching the reference (purple → cyan → yellow → green → orange/red)
+    final gradientColors = [
+      const Color(0xFFB843FF), // Bright purple/magenta
+      const Color(0xFF43C6FF), // Bright cyan
+      const Color(0xFFFFC043), // Yellow/orange
+      const Color(0xFF7BFF43), // Bright green
+      const Color(0xFFFF5543), // Orange/red
+    ];
+
+    // Draw glow effect behind the path
+    for (int i = 0; i < points.length - 1; i++) {
+      final t = i / math.max(1, points.length - 1);
+      final glowColor = _getGradientColor(gradientColors, t);
+      
+      // Outer glow
+      final glowPaint = Paint()
+        ..color = glowColor.withValues(alpha: 0.4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = pathWidth * 1.8
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      
+      canvas.drawLine(points[i], points[i + 1], glowPaint);
+    }
+
+    // Draw main path with gradient
+    for (int i = 0; i < points.length - 1; i++) {
+      final t = i / math.max(1, points.length - 1);
+      final color = _getGradientColor(gradientColors, t);
+      
+      // Main path stroke
+      final pathPaint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            _getGradientColor(gradientColors, i / math.max(1, points.length - 1)),
+            _getGradientColor(gradientColors, (i + 1) / math.max(1, points.length - 1)),
+          ],
+        ).createShader(Rect.fromPoints(points[i], points[i + 1]))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = pathWidth
+        ..strokeCap = StrokeCap.round;
+      
+      canvas.drawLine(points[i], points[i + 1], pathPaint);
+    }
+
+    // Add subtle inner highlight for depth
+    for (int i = 0; i < points.length - 1; i++) {
+      final highlightPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = pathWidth * 0.4
+        ..strokeCap = StrokeCap.round;
+      
+      canvas.drawLine(points[i], points[i + 1], highlightPaint);
+    }
+  }
+
+  Color _getGradientColor(List<Color> colors, double t) {
+    if (t <= 0) return colors.first;
+    if (t >= 1) return colors.last;
     
-    for (int i = 1; i < points.length; i++) {
-      path.lineTo(points[i].dx, points[i].dy);
-    }
-
-    return path;
+    final scaledT = t * (colors.length - 1);
+    final index = scaledT.floor();
+    final nextIndex = (index + 1).clamp(0, colors.length - 1);
+    final localT = scaledT - index;
+    
+    return Color.lerp(colors[index], colors[nextIndex], localT)!;
   }
 
   void _drawSinglePoint(Canvas canvas, GridCell cell) {
     final center = _getCellCenter(cell);
 
-    // Reduced outer glow
-    final outerGlowPaint = Paint()
-      ..color = pathColor.withValues(alpha: 0.25)
+    // Glow
+    final glowPaint = Paint()
+      ..color = const Color(0xFFB843FF).withValues(alpha: 0.4)
       ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-    canvas.drawCircle(center, pathWidth * 0.9, outerGlowPaint);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    canvas.drawCircle(center, pathWidth * 0.9, glowPaint);
 
-    // Main point - random VIBGYOR color
+    // Main dot
     final paint = Paint()
-      ..color = pathColor
+      ..color = const Color(0xFFB843FF)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, pathWidth / 2, paint);
+    canvas.drawCircle(center, pathWidth * 0.55, paint);
 
-    // Small white highlight
+    // Highlight
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.25)
+      ..color = Colors.white.withValues(alpha: 0.3)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, pathWidth / 4, highlightPaint);
+    canvas.drawCircle(center, pathWidth * 0.3, highlightPaint);
   }
 
   Offset _getCellCenter(GridCell cell) {

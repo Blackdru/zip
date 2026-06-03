@@ -43,6 +43,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Keystore files - NEVER commit these!
+*.jks
+*.keystore
+key.properties
+
 # Code generation
 *.g.dart
 *.freezed.dart

@@ -18,21 +18,69 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Path Puzzle - A premium competitive puzzle game">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="flutter_zip_app">
+  <meta name="apple-mobile-web-app-title" content="Path Puzzle">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>flutter_zip_app</title>
+  <title>Path Puzzle</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Splash screen styles */
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    
+    .splash-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #1e1e3c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    
+    .splash-logo {
+      width: 150px;
+      height: 150px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.8;
+        transform: scale(0.95);
+      }
+    }
+    
+    /* Hide splash when Flutter is ready */
+    .flutter-ready .splash-container {
+      display: none;
+    }
+  </style>
 </head>
 <body>
+  <!-- Splash Screen -->
+  <div class="splash-container">
+    <img class="splash-logo" src="icons/Icon-192.png" alt="Loading...">
+  </div>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -42,5 +90,12 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  
+  <script>
+    // Hide splash screen when Flutter is ready
+    window.addEventListener('flutter-first-frame', function () {
+      document.body.classList.add('flutter-ready');
+    });
+  </script>
 </body>
 </html>

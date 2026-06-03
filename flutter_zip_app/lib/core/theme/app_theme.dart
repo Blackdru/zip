@@ -113,7 +113,6 @@ class AppTheme {
         surface: richPurple,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
-        onSurface: ink,
       ),
     );
 

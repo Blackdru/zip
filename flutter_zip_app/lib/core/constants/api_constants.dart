@@ -3,10 +3,10 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URLs
-  static const String productionBaseUrl = 'https://your-api-domain.com/api/v1';
-  static const String developmentBaseUrl = 'http://localhost:3000/api/v1';
+  static const String productionBaseUrl = 'https://zip.robotpdf.com/api/v1';
+  static const String developmentBaseUrl = 'http://localhost:2020/api/v1';
   // Android emulator uses 10.0.2.2 to access host machine's localhost
-  static const String androidEmulatorBaseUrl = 'http://10.0.2.2:3000/api/v1';
+  static const String androidEmulatorBaseUrl = 'http://10.0.2.2:2020/api/v1';
 
   // Timeouts
   static const Duration connectTimeout = Duration(seconds: 10);

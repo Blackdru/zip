@@ -11,8 +11,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _sound = true;
-  bool _music = true;
   bool _notifications = true;
   bool _vibration = true;
 
@@ -80,24 +78,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const SizedBox(height: 40),
                 
                 _section(
-                  'Audio',
-                  Icons.volume_up_rounded,
-                  AppTheme.vibrantPurple,
-                  [
-                    _toggle('Sound effects', Icons.music_note_rounded, _sound,
-                        (v) => setState(() => _sound = v)),
-                    _toggle('Background music', Icons.audiotrack_rounded, _music,
-                        (v) => setState(() => _music = v)),
-                  ],
-                ),
-                
-                _section(
                   'Notifications',
                   Icons.notifications_rounded,
                   AppTheme.electricBlue,
                   [
                     _toggle('Push notifications', Icons.notifications_active_rounded,
-                        _notifications, (v) => setState(() => _notifications = v)),
+                        _notifications, (v) => setState(() => _notifications = v),),
                   ],
                 ),
                 
@@ -107,7 +93,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   AppTheme.neonGreen,
                   [
                     _toggle('Haptic feedback', Icons.vibration_rounded, _vibration,
-                        (v) => setState(() => _vibration = v)),
+                        (v) => setState(() => _vibration = v),),
                   ],
                 ),
                 
@@ -116,9 +102,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Icons.info_rounded,
                   AppTheme.warmOrange,
                   [
-                    _info('Version', '1.0.0', Icons.stars_rounded),
-                    _action('Privacy Policy', Icons.privacy_tip_rounded, () {}),
-                    _action('Terms of Service', Icons.description_rounded, () {}),
+                    _info('Version', '1.0.5', Icons.stars_rounded),
                   ],
                 ),
                 
@@ -132,7 +116,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         shaderCallback: (bounds) =>
                             AppTheme.neonGradient.createShader(bounds),
                         child: const Text(
-                          'ZIP',
+                          'Path Puzzle',
                           style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 32,
@@ -269,44 +253,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: onChanged,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _action(String title, IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.border.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 20, color: AppTheme.inkLight),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.ink,
-                ),
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: AppTheme.inkFaint,
-            ),
-          ],
-        ),
       ),
     );
   }

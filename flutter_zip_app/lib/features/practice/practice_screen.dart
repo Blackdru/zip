@@ -93,7 +93,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                   width: 2,
                 ),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
@@ -101,11 +101,11 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                     size: 16,
                     color: AppTheme.electricBlue,
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6),
                   Text(
                     'How to Play',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 10,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.ink,
                     ),
@@ -171,7 +171,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                   const SizedBox(height: 16),
                   
                   Text(
-                    'Each puzzle is uniquely generated.\nPlay endless puzzles at your own pace.',
+                    'Each puzzle is uniquely generated.\nPlay Unlimited randomly generated puzzles from easy to hard at your pace.',
                     style: TextStyle(
                       fontSize: 15,
                       color: AppTheme.inkLight.withValues(alpha: 0.8),
@@ -210,7 +210,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.emoji_events_rounded,
                               size: 20,
                               color: AppTheme.neonGreen,
@@ -570,11 +570,11 @@ class _HowToPlaySheet extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     _diffRow('Easy', '5×5 grid, 5–6 checkpoints',
-                        AppTheme.neonGreen),
+                        AppTheme.neonGreen,),
                     _diffRow('Medium', '6×6 grid, 7–9 checkpoints',
-                        AppTheme.warmOrange),
+                        AppTheme.warmOrange,),
                     _diffRow('Hard', '7×7 grid, 10–12 checkpoints',
-                        AppTheme.neonPink),
+                        AppTheme.neonPink,),
                   ],
                 ),
               ),

@@ -27,56 +27,48 @@ class CheckpointRenderer extends PositionComponent {
   }
 
   void _drawClueNumbers(Canvas canvas) {
+    // Vibrant checkpoint colors matching the reference image
+    final checkpointColors = [
+      const Color(0xFFB843FF), // Purple for 1
+      const Color(0xFF43C6FF), // Cyan for 2
+      const Color(0xFFFFC043), // Yellow/Orange for 3
+      const Color(0xFF7BFF43), // Green for 4
+      const Color(0xFFFF5543), // Red for 5
+    ];
+
     for (final clue in clueNumbers) {
       final centerX = (clue.x * cellSize) + (cellSize / 2);
       final centerY = (clue.y * cellSize) + (cellSize / 2);
       final center = Offset(centerX, centerY);
-      final radius = cellSize * 0.28; // Reduced from 0.35 to 0.28
+      final radius = cellSize * 0.28; // Reduced from 0.32 to 0.28
 
-      // Subtle outer glow ring (dark to make white circle pop)
-      final outerGlowPaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.3)
-        ..style = PaintingStyle.fill
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-      canvas.drawCircle(center, radius * 1.3, outerGlowPaint);
+      // Get color for this checkpoint number
+      final color = checkpointColors[(clue.num - 1) % checkpointColors.length];
 
-      // Main circle background - WHITE
+      // NO GLOW - Clean solid badges only
+      
+      // Main badge circle with solid color - NO gradient, NO highlights
       final circlePaint = Paint()
-        ..color = Colors.white
+        ..color = color
         ..style = PaintingStyle.fill;
       canvas.drawCircle(center, radius, circlePaint);
 
-      // Subtle shadow border
-      final borderShadowPaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.15)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-      canvas.drawCircle(center, radius, borderShadowPaint);
-
-      // Clean border
+      // Very subtle border for definition only
       final borderPaint = Paint()
-        ..color = Colors.black.withValues(alpha: 0.2)
+        ..color = Colors.white.withValues(alpha: 0.15)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
+        ..strokeWidth = 1.0;
       canvas.drawCircle(center, radius, borderPaint);
 
-      // Draw number - BLACK text
+      // Draw white number text - completely flat, no effects
       final textPainter = TextPainter(
         text: TextSpan(
           text: '${clue.num}',
           style: TextStyle(
-            color: Colors.black,
-            fontSize: cellSize * 0.32, // Reduced from 0.4 to 0.32
+            color: Colors.white,
+            fontSize: cellSize * 0.30, // Reduced from 0.36 to 0.30
             fontWeight: FontWeight.w900,
             fontFamily: 'Poppins',
-            shadows: [
-              Shadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 1,
-                offset: const Offset(0, 0.5),
-              ),
-            ],
           ),
         ),
         textDirection: TextDirection.ltr,

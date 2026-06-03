@@ -26,15 +26,15 @@ class PuzzleBoard extends PositionComponent with HasGameRef {
 
     // Calculate cell size based on game size
     final gameSize = gameRef.size;
-    const padding = 40.0;
+    const padding = 20.0; // Reduced padding to increase board size
     final availableSize = gameSize.x < gameSize.y ? gameSize.x : gameSize.y;
     boardSize = availableSize - (padding * 2);
     cellSize = boardSize / gridSize;
 
-    // Center the board
+    // Center the board horizontally, position slightly higher for banner ad at bottom
     position = Vector2(
       (gameSize.x - boardSize) / 2,
-      (gameSize.y - boardSize) / 2,
+      (gameSize.y - boardSize) / 2 - 30, // Moved up by 30px to accommodate banner ad
     );
 
     size = Vector2(boardSize, boardSize);
@@ -44,15 +44,52 @@ class PuzzleBoard extends PositionComponent with HasGameRef {
   void render(Canvas canvas) {
     super.render(canvas);
 
-    _drawObstacles(canvas);
+    _drawBoardBorder(canvas);
     _drawGrid(canvas);
-    // Checkpoints moved to separate component to render on top of path
+    _drawGridDots(canvas);
+    _drawObstacles(canvas);
+  }
+
+  void _drawBoardBorder(Canvas canvas) {
+    // Draw thick purple gradient border - NO outer glow/shadow
+    final borderRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(-5, -5, boardSize + 10, boardSize + 10),
+      Radius.circular(cellSize * 0.4),
+    );
+
+    // Main gradient border - doubled thickness, NO glow
+    final borderPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [
+          Color(0xFF8B5CF6), // Bright purple
+          Color(0xFF6366F1), // Indigo
+          Color(0xFFA855F7), // Lighter purple
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(borderRect.outerRect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10; // Doubled from 5 to 10
+    canvas.drawRRect(borderRect, borderPaint);
+
+    // Inner subtle highlight
+    final innerHighlightPaint = Paint()
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(-4, -4, boardSize + 8, boardSize + 8),
+        Radius.circular(cellSize * 0.4),
+      ),
+      innerHighlightPaint,
+    );
   }
 
   void _drawObstacles(Canvas canvas) {
-    // Enhanced obstacles with glow
+    // Obstacles slightly more visible than before
     for (final obstacle in obstacles) {
-      const obstaclePadding = 4.0;
+      const obstaclePadding = 3.0;
       
       final rect = Rect.fromLTWH(
         (obstacle.x * cellSize) + obstaclePadding,
@@ -61,104 +98,81 @@ class PuzzleBoard extends PositionComponent with HasGameRef {
         cellSize - (obstaclePadding * 2),
       );
       
-      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+      final rrect = RRect.fromRectAndRadius(rect, Radius.circular(cellSize * 0.12));
       
-      // Outer glow
-      final glowPaint = Paint()
-        ..color = const Color(0xFF1A0B2E).withValues(alpha: 0.8)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-      canvas.drawRRect(rrect, glowPaint);
+      // Dark but slightly visible fill
+      final fillPaint = Paint()
+        ..color = const Color(0xFF0E0E18);
+      canvas.drawRRect(rrect, fillPaint);
       
-      // Dark gradient fill
-      final gradientPaint = Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF1A0B2E), // Deep purple
-            Color(0xFF0A0515), // Almost black
-          ],
-        ).createShader(rect);
-      
-      canvas.drawRRect(rrect, gradientPaint);
-      
-      // Bright border with subtle glow
-      final borderGlowPaint = Paint()
-        ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.4)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-      canvas.drawRRect(rrect, borderGlowPaint);
-      
-      // Solid border
+      // Visible border
       final borderPaint = Paint()
-        ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.7)
+        ..color = const Color(0xFF1E1E30).withValues(alpha: 0.7)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+        ..strokeWidth = 1.2;
       canvas.drawRRect(rrect, borderPaint);
     }
   }
 
   void _drawGrid(Canvas canvas) {
-    // Draw cell backgrounds with subtle gradient
+    // Draw cell backgrounds - more visible with clear purple/blue tint
     for (int row = 0; row < gridSize; row++) {
       for (int col = 0; col < gridSize; col++) {
         final rect = Rect.fromLTWH(
-          col * cellSize,
-          row * cellSize,
-          cellSize,
-          cellSize,
+          col * cellSize + 1,
+          row * cellSize + 1,
+          cellSize - 2,
+          cellSize - 2,
         );
-        
-        // Gradient background for each cell
-        final gradientPaint = Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF2D1B4E).withValues(alpha: 0.4), // Rich purple
-              const Color(0xFF1A0B2E).withValues(alpha: 0.3), // Deep purple
-            ],
-          ).createShader(rect);
         
         final cellRRect = RRect.fromRectAndRadius(
           rect,
-          const Radius.circular(8.0),
+          Radius.circular(cellSize * 0.15),
         );
         
-        canvas.drawRRect(cellRRect, gradientPaint);
+        // More visible cell background with clear gradient
+        final cellPaint = Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF242438), // More visible dark blue-purple
+              Color(0xFF1A1A2A), // Lighter dark
+            ],
+          ).createShader(rect);
+        canvas.drawRRect(cellRRect, cellPaint);
+        
+        // Clearer border for cell definition
+        final borderPaint = Paint()
+          ..color = const Color(0xFF34344A).withValues(alpha: 0.8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2;
+        canvas.drawRRect(cellRRect, borderPaint);
       }
     }
-    
-    // Draw glowing borders (subtle)
-    final glowPaint = Paint()
-      ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.2) // Reduced glow
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
-    
-    final borderPaint = Paint()
-      ..color = const Color(0xFF6C3AFF).withValues(alpha: 0.5) // Slightly reduced
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
+  }
 
-    // Draw cell borders with glow
-    for (int row = 0; row < gridSize; row++) {
-      for (int col = 0; col < gridSize; col++) {
-        final rect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            col * cellSize,
-            row * cellSize,
-            cellSize,
-            cellSize,
-          ),
-          const Radius.circular(8.0),
-        );
+  void _drawGridDots(Canvas canvas) {
+    // Draw dots only at internal cell intersections (not on the board edges)
+    final dotRadius = cellSize * 0.045;
+    
+    // Draw dots at internal grid intersections only (exclude edges)
+    for (int row = 1; row < gridSize; row++) {
+      for (int col = 1; col < gridSize; col++) {
+        final x = col * cellSize;
+        final y = row * cellSize;
+        final center = Offset(x, y);
         
-        // Glow layer
-        canvas.drawRRect(rect, glowPaint);
-        // Solid border
-        canvas.drawRRect(rect, borderPaint);
+        // Visible glow around dot
+        final glowPaint = Paint()
+          ..color = const Color(0xFF6B7AFF).withValues(alpha: 0.4)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+        canvas.drawCircle(center, dotRadius * 2.2, glowPaint);
+        
+        // Main dot - more visible
+        final dotPaint = Paint()
+          ..color = const Color(0xFF5A6AAA).withValues(alpha: 0.85);
+        canvas.drawCircle(center, dotRadius, dotPaint);
       }
     }
   }

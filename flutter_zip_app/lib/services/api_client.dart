@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../core/constants/api_constants.dart';
@@ -15,18 +14,8 @@ class ApiClient {
   Dio get dio => _dio;
 
   BaseOptions _getBaseOptions() {
-    String baseUrl;
-
-    if (kReleaseMode) {
-      baseUrl = ApiConstants.productionBaseUrl;
-    } else {
-      // Development mode - detect platform
-      if (Platform.isAndroid) {
-        baseUrl = ApiConstants.androidEmulatorBaseUrl;
-      } else {
-        baseUrl = ApiConstants.developmentBaseUrl;
-      }
-    }
+    // Always use production API endpoint
+    String baseUrl = ApiConstants.productionBaseUrl;
 
     return BaseOptions(
       baseUrl: baseUrl,
