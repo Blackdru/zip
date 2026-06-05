@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flame/game.dart';
@@ -7,6 +8,7 @@ import '../../flame/connect_dots_game.dart';
 import '../../models/connect_dots_puzzle.dart';
 import '../../models/color_dot.dart';
 import '../../providers/connect_dots_provider.dart';
+import '../../providers/puzzle_stats_provider.dart';
 
 class ConnectDotsScreen extends ConsumerStatefulWidget {
   final String? puzzleId;
@@ -25,7 +27,9 @@ class ConnectDotsScreen extends ConsumerStatefulWidget {
 class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   ConnectDotsGame? _game;
   int _elapsedSeconds = 0;
-  bool _isTimerRunning = false;
+  // FIX #1: Use a cancellable Timer instead of Future.doWhile to prevent
+  // setState calls on a disposed widget.
+  Timer? _timer;
   bool _isShowingCompletionDialog = false;
 
   @override
@@ -34,18 +38,32 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
     _loadPuzzle();
   }
 
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadPuzzle() async {
+    // FIX #2: Use microtask to defer provider access until after the first frame,
+    // then wait for the notifier's async work to complete before reading state.
     await Future.microtask(() async {
       if (widget.isPractice) {
-        // Puzzle already loaded by PracticeScreen
+        // Puzzle already loaded by PracticeScreen — read it directly.
+        final puzzleState = ref.read(connectDotsProvider);
+        if (puzzleState.puzzle != null && mounted) {
+          _initializeGame(puzzleState.puzzle!);
+          _startTimer();
+        }
       } else if (widget.puzzleId != null) {
+        // Await the full async load so the state is settled before we read it.
         await ref.read(connectDotsProvider.notifier).loadPuzzle(widget.puzzleId!);
-      }
-
-      final puzzleState = ref.read(connectDotsProvider);
-      if (puzzleState.puzzle != null) {
-        _initializeGame(puzzleState.puzzle!);
-        _startTimer();
+        if (!mounted) return;
+        final puzzleState = ref.read(connectDotsProvider);
+        if (puzzleState.puzzle != null) {
+          _initializeGame(puzzleState.puzzle!);
+          _startTimer();
+        }
       }
     });
   }
@@ -84,16 +102,16 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   }
 
   void _startTimer() {
+    // FIX #1: Cancel any existing timer before starting a new one to prevent
+    // double-timer bugs (e.g. reset → new puzzle path).
+    _timer?.cancel();
     setState(() {
-      _isTimerRunning = true;
       _elapsedSeconds = 0;
     });
-
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted || !_isTimerRunning) return false;
-      setState(() => _elapsedSeconds++);
-      return true;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _elapsedSeconds++);
+      }
     });
   }
 
@@ -103,12 +121,22 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   ) async {
     if (_isShowingCompletionDialog) return;
 
-    final displayTimeMs = _elapsedSeconds * 1000;
+    // BUG FIX #8: The old code used `_elapsedSeconds * 1000` which is only
+    // 1-second granular (the widget-side Timer.periodic ticks once per second).
+    // The game engine already tracks precise milliseconds from startPuzzle() to
+    // completion — use that directly for both display and server submission.
+    final displayTimeMs = solveTimeMs;
 
+    // Stop the timer when the puzzle completes.
+    _timer?.cancel();
     setState(() {
-      _isTimerRunning = false;
       _isShowingCompletionDialog = true;
     });
+
+    // Increment completed puzzles count for practice mode
+    if (widget.isPractice) {
+      await ref.read(puzzleStatsProvider.notifier).markPuzzleCompleted();
+    }
 
     if (!widget.isPractice && widget.puzzleId != null) {
       await ref.read(connectDotsProvider.notifier).submitSolution(
@@ -196,7 +224,14 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
             ElevatedButton(
               onPressed: () {
                 context.pop(); // Close dialog
-                _resetPuzzle();
+                // FIX #3: Don't call _resetPuzzle() here — it would start a
+                // timer that _startNewPuzzle() immediately starts a second one.
+                // Instead, reset state flags and let _startNewPuzzle manage
+                // the game + timer lifecycle entirely.
+                setState(() {
+                  _isShowingCompletionDialog = false;
+                  _elapsedSeconds = 0;
+                });
                 _startNewPuzzle();
               },
               style: ElevatedButton.styleFrom(
@@ -218,10 +253,10 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   void _resetPuzzle() {
     setState(() {
       _elapsedSeconds = 0;
-      _isTimerRunning = false;
       _isShowingCompletionDialog = false;
     });
     _game?.reset();
+    // _startTimer() cancels any previous timer internally before starting fresh.
     _startTimer();
   }
 
@@ -230,13 +265,36 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
     if (puzzleState.puzzle != null) {
       final difficulty = puzzleState.puzzle!.difficulty;
       final sequence = DateTime.now().millisecondsSinceEpoch % 1000;
-      
+
+      // Clear any stale error before starting a new request (same fix as in
+      // practice_screen). The copyWith sentinel means isLoading=true no longer
+      // wipes the error, so we must clear it explicitly before a new attempt.
+      ref.read(connectDotsProvider.notifier).clearError();
+
       await ref
           .read(connectDotsProvider.notifier)
           .generatePracticePuzzle(difficulty, sequence);
-      
-      final newPuzzle = ref.read(connectDotsProvider).puzzle;
+
+      if (!mounted) return;
+
+      final newState = ref.read(connectDotsProvider);
+      if (newState.error != null) {
+        // Network / server failure: show error and clear it from the provider.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load next puzzle: ${newState.error}'),
+            backgroundColor: const Color(0xFFB91C1C),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        ref.read(connectDotsProvider.notifier).clearError();
+        return;
+      }
+
+      final newPuzzle = newState.puzzle;
       if (newPuzzle != null) {
+        // _initializeGame + _startTimer are the single path that starts the
+        // timer; no duplicate start happens here.
         _initializeGame(newPuzzle);
         _startTimer();
       }

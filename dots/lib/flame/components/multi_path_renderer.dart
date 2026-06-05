@@ -10,6 +10,9 @@ class MultiPathRenderer extends PositionComponent {
 
   Map<int, List<PathCell>> _activePaths = {};
   Vector2? _currentDragPosition;
+  // Track which pair is actively being drawn so the preview is only shown
+  // for that pair, not for every path in the map.
+  int? _currentActivePairId;
   late double pathWidth;
 
   // Color mapping for dots
@@ -38,14 +41,22 @@ class MultiPathRenderer extends PositionComponent {
     size = Vector2(cellSize * gridSize, cellSize * gridSize);
   }
 
-  void updatePaths(Map<int, List<PathCell>> paths, {Vector2? dragPosition}) {
+  void updatePaths(
+    Map<int, List<PathCell>> paths, {
+    Vector2? dragPosition,
+    // currentPairId identifies which pair owns the ongoing drag gesture.
+    // Only that pair should show the preview extension toward the finger.
+    int? currentPairId,
+  }) {
     _activePaths = Map.from(paths);
     _currentDragPosition = dragPosition;
+    _currentActivePairId = currentPairId;
   }
 
   void clearPaths() {
     _activePaths.clear();
     _currentDragPosition = null;
+    _currentActivePairId = null;
   }
 
   @override
@@ -78,8 +89,13 @@ class MultiPathRenderer extends PositionComponent {
 
     final points = path.map((cell) => _getCellCenter(cell)).toList();
 
-    // Add drag position if this is the active path
-    if (_currentDragPosition != null && _activePaths[pairId] == path) {
+    // BUG FIX: Only extend the path toward the drag position for the pair that
+    // is CURRENTLY being drawn. The old check (_activePaths[pairId] == path)
+    // was always true because both sides reference the same map value, so every
+    // path got a preview tail drawn toward the finger position, causing:
+    //   • Completed paths to visually extend while drawing another pair.
+    //   • Idle paths to sprout a floating segment from their last cell.
+    if (_currentDragPosition != null && pairId == _currentActivePairId) {
       final lastPoint = points.last;
       final clampedX = _currentDragPosition!.x.clamp(0.0, cellSize * gridSize);
       final clampedY = _currentDragPosition!.y.clamp(0.0, cellSize * gridSize);

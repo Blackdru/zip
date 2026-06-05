@@ -27,6 +27,33 @@ export interface SubmitSolutionResponse {
 
 export class ConnectDotsService {
   /**
+   * Generate a random practice puzzle with random difficulty
+   */
+  static async generateRandomPuzzle(): Promise<ConnectDotsPuzzleResponse> {
+    const difficulties: Difficulty[] = ['easy', 'medium', 'hard'];
+    const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+    const randomSequence = Math.floor(Math.random() * 10000) + Date.now();
+    
+    const seed = ConnectDotsEngine.randomSeed();
+    const puzzle = ConnectDotsEngine.generate(seed, randomDifficulty);
+
+    // Convert solution paths to array format
+    const solutionPaths = Array.from(puzzle.solutionPaths.entries()).map(
+      ([pairId, path]) => ({ pairId, path })
+    );
+
+    return {
+      id: `random-${randomDifficulty}-${randomSequence}`,
+      seed: puzzle.seed,
+      gridSize: puzzle.gridSize,
+      difficulty: puzzle.difficulty,
+      colorDots: puzzle.colorDots,
+      totalPairs: puzzle.totalPairs,
+      solutionPaths,
+    };
+  }
+
+  /**
    * Generate a practice puzzle with solution paths (for hints)
    */
   static async generatePracticePuzzle(

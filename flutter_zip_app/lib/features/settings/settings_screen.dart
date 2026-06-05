@@ -102,7 +102,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Icons.info_rounded,
                   AppTheme.warmOrange,
                   [
-                    _info('Version', '1.0.5', Icons.stars_rounded),
+                    _info('Version', '1.0.6', Icons.stars_rounded),
                   ],
                 ),
                 

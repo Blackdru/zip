@@ -108,36 +108,44 @@ class ConnectDotsGame extends FlameGame {
       completedPairs: completedCount,
     );
 
-    _pathRenderer.updatePaths(activePaths, dragPosition: dragPosition);
+    _pathRenderer.updatePaths(
+      activePaths,
+      dragPosition: dragPosition,
+      // FIX: tell the renderer which pair is being drawn so only that pair
+      // gets the live drag-preview extension toward the finger.
+      currentPairId: currentPairId,
+    );
     onStateChanged(_gameState);
   }
 
   bool _isPathComplete(List<PathCell> path) {
     if (path.length < 2) return false;
-    
-    // Find the dots for this path
+
+    // FIX #5: Find the pairId that owns the first cell of this path, then check
+    // whether the last cell matches the other dot of that pair. This is O(n)
+    // instead of the previous O(n²) double-loop and is consistent with the
+    // gesture controller’s own _isPathComplete(path, pairId).
     final firstCell = path.first;
     final lastCell = path.last;
-    
-    // Check if path connects two dots of the same color
-    for (int i = 0; i < puzzleData.colorDots.length; i++) {
-      final dot1 = puzzleData.colorDots[i];
-      for (int j = i + 1; j < puzzleData.colorDots.length; j++) {
-        final dot2 = puzzleData.colorDots[j];
-        
-        if (dot1.pairId == dot2.pairId) {
-          final startsAt1 = firstCell.x == dot1.x && firstCell.y == dot1.y;
-          final endsAt2 = lastCell.x == dot2.x && lastCell.y == dot2.y;
-          final startsAt2 = firstCell.x == dot2.x && firstCell.y == dot2.y;
-          final endsAt1 = lastCell.x == dot1.x && lastCell.y == dot1.y;
-          
-          if ((startsAt1 && endsAt2) || (startsAt2 && endsAt1)) {
-            return true;
-          }
-        }
+
+    // Identify which dot the path starts at.
+    ColorDot? startDot;
+    for (final dot in puzzleData.colorDots) {
+      if (dot.x == firstCell.x && dot.y == firstCell.y) {
+        startDot = dot;
+        break;
       }
     }
-    
+    if (startDot == null) return false;
+
+    // Find the other dot of the same pair and check if the path ends there.
+    for (final dot in puzzleData.colorDots) {
+      if (dot.pairId == startDot.pairId &&
+          (dot.x != startDot.x || dot.y != startDot.y)) {
+        return lastCell.x == dot.x && lastCell.y == dot.y;
+      }
+    }
+
     return false;
   }
 

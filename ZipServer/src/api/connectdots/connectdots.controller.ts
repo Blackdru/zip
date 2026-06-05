@@ -4,8 +4,30 @@ import type { Difficulty } from '../../types';
 
 export class ConnectDotsController {
   /**
+   * GET /api/v1/connectdots/random
+   * Get a random puzzle with random difficulty
+   */
+  static async getRandomPuzzle(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const puzzle = await ConnectDotsService.generateRandomPuzzle();
+
+      res.json({
+        success: true,
+        data: puzzle,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/v1/connectdots/practice
    * Get a practice puzzle with solution for hints
+   * Now supports optional parameters - generates random if not provided
    */
   static async getPracticePuzzle(
     req: Request,
@@ -14,6 +36,16 @@ export class ConnectDotsController {
   ): Promise<void> {
     try {
       const { difficulty, sequence } = req.query;
+
+      // If no parameters provided, generate random puzzle
+      if (!difficulty && !sequence) {
+        const puzzle = await ConnectDotsService.generateRandomPuzzle();
+        res.json({
+          success: true,
+          data: puzzle,
+        });
+        return;
+      }
 
       if (!difficulty || !sequence) {
         res.status(400).json({

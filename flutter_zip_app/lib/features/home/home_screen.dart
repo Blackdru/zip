@@ -94,26 +94,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   
                   // App icon/logo
                   Center(
-                    child: Container(
-                      width: 300,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color.fromARGB(255, 0, 0, 0).withValues(alpha: 0.1),
+                    child: AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: 0.95 + (_pulseAnimation.value - 0.8) * 0.1,
+                          child: Container(
+                            width: 180,
+                            height: 180,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(40),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.vibrantPurple.withValues(alpha: 0.3 * _pulseAnimation.value),
+                                  blurRadius: 30 * _pulseAnimation.value,
+                                  spreadRadius: 5,
+                                ),
+                                BoxShadow(
+                                  color: AppTheme.electricBlue.withValues(alpha: 0.2 * _pulseAnimation.value),
+                                  blurRadius: 20 * _pulseAnimation.value,
+                                  spreadRadius: 3,
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(40),
+                              child: Image.asset(
+                                'assets/icons/icon.png',
+                                width: 180,
+                                height: 180,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(32),
-                        child: Image.asset(
-                          'assets/images/app_icon.png',
-                          width: 140,
-                          height: 140,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
                   

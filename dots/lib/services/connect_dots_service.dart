@@ -41,6 +41,16 @@ class ConnectDotsService {
     }
   }
 
+  /// Get a random puzzle with random difficulty
+  Future<ConnectDotsPuzzle> getRandomPuzzle() async {
+    try {
+      final response = await _apiClient.dio.get('/connectdots/random');
+      return ConnectDotsPuzzle.fromJson(response.data['data']);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// Get a practice puzzle with solution paths for hints
   Future<ConnectDotsPuzzle> getPracticePuzzle({
     required Difficulty difficulty,

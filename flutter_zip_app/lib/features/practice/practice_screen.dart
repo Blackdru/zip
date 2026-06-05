@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/router/app_router.dart';
 import '../../providers/puzzle_provider.dart';
+import '../../providers/puzzle_stats_provider.dart';
 
 class PracticeScreen extends ConsumerStatefulWidget {
   const PracticeScreen({super.key});
@@ -14,7 +15,6 @@ class PracticeScreen extends ConsumerStatefulWidget {
 
 class _PracticeScreenState extends ConsumerState<PracticeScreen>
     with SingleTickerProviderStateMixin {
-  int _sessionCount = 0;
   bool _isGenerating = false;
   late AnimationController _shimmerController;
 
@@ -40,10 +40,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
     try {
       await ref.read(puzzleProvider.notifier).generateRandomPuzzle();
       if (mounted) {
-        setState(() {
-          _sessionCount++;
-          _isGenerating = false;
-        });
+        setState(() => _isGenerating = false);
         context.push('${AppRoutes.puzzle}?practice=true');
       }
     } catch (_) {
@@ -53,6 +50,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final statsState = ref.watch(puzzleStatsProvider);
+    
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       extendBodyBehindAppBar: true,
@@ -209,8 +208,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                   
                   const Spacer(),
                   
-                  // Session count
-                  if (_sessionCount > 0) ...[
+                  // Persistent puzzle completion count
+                  if (statsState.totalCompleted > 0) ...[
                     Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -240,7 +239,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen>
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '$_sessionCount ${_sessionCount == 1 ? 'PUZZLE' : 'PUZZLES'} COMPLETED',
+                              '${statsState.totalCompleted} ${statsState.totalCompleted == 1 ? 'PUZZLE' : 'PUZZLES'} COMPLETED',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,

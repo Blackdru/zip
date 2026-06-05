@@ -67,11 +67,22 @@ export class ConnectDotsEngine {
   static generate(seed: string, difficulty: Difficulty, maxAttempts = 500): ConnectDotsPuzzle {
     const params = this.getDifficultyParams(difficulty);
 
+    // Try with different pair counts to increase success rate
+    const pairCounts = [];
+    for (let p = params.minPairs; p <= params.maxPairs; p++) {
+      pairCounts.push(p);
+    }
+    // Add one less pair as fallback
+    if (params.minPairs > 2) {
+      pairCounts.push(params.minPairs - 1);
+    }
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const attemptSeed = `${seed}:attempt:${attempt}`;
       const rng = SeedRng.fromString(attemptSeed);
 
-      const pairCount = rng.nextInt(params.minPairs, params.maxPairs);
+      // Cycle through different pair counts
+      const pairCount = pairCounts[attempt % pairCounts.length];
       
       // Generate space-filling paths with improved algorithm
       const result = this.generateSpaceFillingPaths(params.gridSize, pairCount, rng);
@@ -101,37 +112,33 @@ export class ConnectDotsEngine {
       };
     }
 
-    // If all attempts failed, try with one fewer pair
-    // This fallback ensures we almost always generate something
-    if (params.minPairs > 2) {
-      const fallbackParams = { ...params, minPairs: params.minPairs - 1 };
-      for (let attempt = 0; attempt < 100; attempt++) {
-        const attemptSeed = `${seed}:fallback:${attempt}`;
-        const rng = SeedRng.fromString(attemptSeed);
-        const pairCount = rng.nextInt(fallbackParams.minPairs, fallbackParams.maxPairs);
-        
-        const result = this.generateSpaceFillingPaths(params.gridSize, pairCount, rng);
-        if (!result) continue;
+    // Last resort: try with minimum pairs and more aggressive settings
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const attemptSeed = `${seed}:lastresort:${attempt}`;
+      const rng = SeedRng.fromString(attemptSeed);
+      const pairCount = Math.max(2, params.minPairs - 1);
+      
+      const result = this.generateSpaceFillingPaths(params.gridSize, pairCount, rng);
+      if (!result) continue;
 
-        const { paths, dots } = result;
-        const totalCells = params.gridSize * params.gridSize;
-        const coveredCells = new Set<string>();
-        paths.forEach((path) => {
-          path.forEach((cell) => coveredCells.add(`${cell.x},${cell.y}`));
-        });
+      const { paths, dots } = result;
+      const totalCells = params.gridSize * params.gridSize;
+      const coveredCells = new Set<string>();
+      paths.forEach((path) => {
+        path.forEach((cell) => coveredCells.add(`${cell.x},${cell.y}`));
+      });
 
-        if (coveredCells.size !== totalCells) continue;
-        if (!this.validateSolvability(paths, dots, params.gridSize)) continue;
+      if (coveredCells.size !== totalCells) continue;
+      if (!this.validateSolvability(paths, dots, params.gridSize)) continue;
 
-        return {
-          seed,
-          gridSize: params.gridSize,
-          difficulty,
-          colorDots: dots,
-          totalPairs: pairCount,
-          solutionPaths: paths,
-        };
-      }
+      return {
+        seed,
+        gridSize: params.gridSize,
+        difficulty,
+        colorDots: dots,
+        totalPairs: pairCount,
+        solutionPaths: paths,
+      };
     }
 
     throw new Error(
@@ -367,5 +374,14 @@ export class ConnectDotsEngine {
    */
   static practiceSeed(difficulty: Difficulty, sequence: number): string {
     return `connectdots:practice:${difficulty}:${sequence}`;
+  }
+
+  /**
+   * Generates a random seed for one-off puzzles.
+   */
+  static randomSeed(): string {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000000);
+    return `connectdots:random:${timestamp}:${random}`;
   }
 }

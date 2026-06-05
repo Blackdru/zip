@@ -21,6 +21,7 @@ class DotsGestureController extends PositionComponent
   // State for all paths
   final Map<int, List<PathCell>> _allPaths = {};
   final Map<int, Set<String>> _visitedCellsPerPath = {};
+  final Set<int> _completedPairIds = {}; // Track which pairs are complete
   
   int? _currentPairId;
   bool _isDrawing = false;
@@ -48,64 +49,107 @@ class DotsGestureController extends PositionComponent
     final cell = _screenToGrid(event.localPosition);
     if (cell == null) return;
 
-    // IMPORTANT: Check if starting from a dot (not just any cell)
+    // IMPORTANT: Must start from a dot (not any cell)
     final dot = _getDotAtCell(cell);
     if (dot == null) {
-      // Not starting from a dot, ignore this gesture
+      // Not starting from a dot - ignore completely
       return;
     }
 
     final pairId = dot.pairId;
 
-    // Check if path already exists for this pair
+    // CRITICAL: If we're switching to a different pair, end the previous drawing session
+    if (_isDrawing && _currentPairId != null && _currentPairId != pairId) {
+      // Finish the previous path first
+      final previousPath = _allPaths[_currentPairId];
+      if (previousPath != null && _isPathComplete(previousPath, _currentPairId!)) {
+        _completedPairIds.add(_currentPairId!);
+      }
+      
+      _isDrawing = false;
+      _currentPairId = null;
+      _currentDragPosition = null;
+      
+      // Update UI to reflect the finished previous path
+      onPathUpdate(_allPaths, null, null);
+    }
+
+    // Check if this pair has a path
     if (_allPaths.containsKey(pairId) && _allPaths[pairId]!.isNotEmpty) {
       final existingPath = _allPaths[pairId]!;
       final firstCell = existingPath.first;
       final lastCell = existingPath.last;
 
-      // Check if this path is complete
-      final isComplete = _isPathComplete(existingPath, pairId);
+      // Check if path is complete (locked)
+      final isComplete = _completedPairIds.contains(pairId);
 
-      // Only allow continuing from the exact dot endpoints
-      if (_isSameCell(cell, firstCell)) {
-        if (isComplete) {
-          // Complete path - clear it completely to restart
-          _clearPath(pairId);
-        } else {
-          // Incomplete path - reverse and continue
-          _allPaths[pairId] = existingPath.reversed.toList();
-          _visitedCellsPerPath[pairId] = Set.from(existingPath.map(_cellKey));
-        }
-        _currentPairId = pairId;
-        _isDrawing = true;
-        _allPaths[pairId] = [PathCell(x: cell.x, y: cell.y)];
-        _visitedCellsPerPath[pairId] = {_cellKey(cell)};
-        _currentDragPosition = event.localPosition;
-        onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
-        return;
-      } else if (_isSameCell(cell, lastCell)) {
-        if (isComplete) {
-          // Complete path - clear it completely to restart
+      if (isComplete) {
+        // COMPLETE PATH - LOCKED
+        // Only allow clicking on endpoint dots to restart
+        final clickedOnEndpoint = _isSameCell(cell, firstCell) || _isSameCell(cell, lastCell);
+        
+        if (clickedOnEndpoint) {
+          // Clear the complete path to restart
           _clearPath(pairId);
           _currentPairId = pairId;
           _isDrawing = true;
           _allPaths[pairId] = [PathCell(x: cell.x, y: cell.y)];
           _visitedCellsPerPath[pairId] = {_cellKey(cell)};
-        } else {
-          // Incomplete path - continue from end
-          _currentPairId = pairId;
-          _isDrawing = true;
+          _currentDragPosition = event.localPosition;
+          onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
         }
-        _currentDragPosition = event.localPosition;
-        onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
+        // If clicked elsewhere on a complete path, ignore
         return;
       } else {
-        // Clicked on a dot but not an endpoint - clear path and start fresh
-        _clearPath(pairId);
+        // INCOMPLETE PATH - ALWAYS ALLOW INTERACTION FROM ENDPOINTS
+        if (_isSameCell(cell, firstCell)) {
+          // Clicked on first endpoint - reverse and continue from other end
+          _allPaths[pairId] = existingPath.reversed.toList();
+          _visitedCellsPerPath[pairId] = Set.from(existingPath.map(_cellKey));
+          _currentPairId = pairId;
+          _isDrawing = true;
+          _currentDragPosition = event.localPosition;
+          onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
+          return;
+        } else if (_isSameCell(cell, lastCell)) {
+          // Clicked on last endpoint - continue from current end
+          _currentPairId = pairId;
+          _isDrawing = true;
+          _currentDragPosition = event.localPosition;
+          onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
+          return;
+        } else {
+          // The user tapped a dot of this pair that is NOT at either current
+          // endpoint (firstCell or lastCell).
+          //
+          // We know `cell` IS a valid dot of this pair because _getDotAtCell
+          // returned non-null with dot.pairId == pairId. And the two checks
+          // above already confirmed it is neither firstCell nor lastCell.
+          // Since each pair has exactly 2 dots and firstCell is always at one
+          // of them, `cell` MUST be the partner dot.
+          //
+          // FROZEN-DOT BUG FIX: the previous code did:
+          //   matchingDot = find the dot of this pair that ≠ dot (clicked dot)
+          //   if (_isSameCell(cell, matchingDot)) { restart }
+          //
+          // `matchingDot` was the OTHER dot (e.g. dotA when user clicked dotB),
+          // so the check `_isSameCell(dotB, dotA)` was ALWAYS false → nothing
+          // ever happened → the pair's dots became permanently unresponsive.
+          //
+          // Fix: skip the redundant guard and always clear + restart from `cell`.
+          _clearPath(pairId);
+          _currentPairId = pairId;
+          _isDrawing = true;
+          _allPaths[pairId] = [PathCell(x: cell.x, y: cell.y)];
+          _visitedCellsPerPath[pairId] = {_cellKey(cell)};
+          _currentDragPosition = event.localPosition;
+          onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
+          return;
+        }
       }
     }
 
-    // Start new path (only if we clicked on a dot)
+    // No existing path for this pair - start fresh
     _currentPairId = pairId;
     _isDrawing = true;
     _allPaths[pairId] = [PathCell(x: cell.x, y: cell.y)];
@@ -118,6 +162,7 @@ class DotsGestureController extends PositionComponent
   void onDragUpdate(DragUpdateEvent event) {
     super.onDragUpdate(event);
 
+    // CRITICAL: Only process if actively drawing and have a current pair
     if (!_isDrawing || _currentPairId == null) return;
 
     final cell = _screenToGrid(event.localEndPosition);
@@ -141,34 +186,47 @@ class DotsGestureController extends PositionComponent
       return;
     }
 
-    // Check if path is already complete (both dots connected)
-    if (_isPathComplete(currentPath, _currentPairId!)) {
-      // Path is complete, stop drawing
+    // IMPORTANT: Verify we're not trying to interact with a different pair's dot
+    final dotAtCell = _getDotAtCell(cell);
+    if (dotAtCell != null && dotAtCell.pairId != _currentPairId) {
+      // Dragging over a different pair's dot - ignore but stop drawing
+      _currentDragPosition = null;
       _finishPath();
       return;
     }
 
-    // Check for backtracking - search through the entire path
-    for (int i = currentPath.length - 2; i >= 0; i--) {
-      if (_isSameCell(currentPath[i], cell)) {
-        // Found the cell in the path - backtrack to it
-        while (currentPath.length > i + 1) {
-          final removed = currentPath.removeLast();
-          _visitedCellsPerPath[_currentPairId]!.remove(_cellKey(removed));
-        }
+    // IMPORTANT: Check if path is already complete - if so, lock it immediately
+    if (_isPathComplete(currentPath, _currentPairId!)) {
+      // Path is complete, stop drawing and lock it
+      _currentDragPosition = null;
+      _finishPath();
+      return;
+    }
+
+    // BACKTRACKING LOGIC: Only allow backtracking to the immediate previous cell
+    // User must be dragging FROM an endpoint dot to backtrack
+    if (currentPath.length >= 2) {
+      final previousCell = currentPath[currentPath.length - 2];
+
+      if (_isSameCell(previousCell, cell)) {
+        // User is moving back to the previous cell - allow backtracking one step
+        final removed = currentPath.removeLast();
+        // FIX #4: Use safe null-coalescing access; the sets should always exist
+        // alongside their path, but guard against any transient out-of-sync state.
+        _visitedCellsPerPath[_currentPairId]?.remove(_cellKey(removed));
         onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
         return;
       }
     }
 
-    // Not backtracking, try to add new cell
+    // Not backtracking to immediate previous cell - try to add new cell (forward movement only)
     if (_isValidMove(cell, _currentPairId!)) {
       currentPath.add(PathCell(x: cell.x, y: cell.y));
       _visitedCellsPerPath[_currentPairId]!.add(_cellKey(cell));
       
       // Check if path just became complete
       if (_isPathComplete(currentPath, _currentPairId!)) {
-        // Path is now complete, finish immediately
+        // Path is now complete, finish and lock immediately
         _currentDragPosition = null;
         _finishPath();
         return;
@@ -179,8 +237,10 @@ class DotsGestureController extends PositionComponent
       // Invalid move - show conflict if trying to cross another path
       final cellKey = _cellKey(cell);
       for (final entry in _allPaths.entries) {
-        if (entry.key != _currentPairId && 
-            _visitedCellsPerPath[entry.key]!.contains(cellKey)) {
+        if (entry.key != _currentPairId &&
+            // FIX #4: Safe lookup — if the visited-cells set is missing for this
+            // entry (transient out-of-sync), treat it as empty rather than crash.
+            (_visitedCellsPerPath[entry.key] ?? {}).contains(cellKey)) {
           onPathConflict?.call();
           break;
         }
@@ -209,6 +269,12 @@ class DotsGestureController extends PositionComponent
   void _finishPath() {
     if (!_isDrawing || _currentPairId == null) return;
 
+    // Check if the current path is complete before finishing
+    final currentPath = _allPaths[_currentPairId];
+    if (currentPath != null && _isPathComplete(currentPath, _currentPairId!)) {
+      _completedPairIds.add(_currentPairId!);
+    }
+
     _isDrawing = false;
     _currentPairId = null;
 
@@ -226,6 +292,7 @@ class DotsGestureController extends PositionComponent
   void _clearPath(int pairId) {
     _allPaths.remove(pairId);
     _visitedCellsPerPath.remove(pairId);
+    _completedPairIds.remove(pairId);
   }
 
   bool _isPathComplete(List<PathCell> path, int pairId) {
@@ -267,7 +334,10 @@ class DotsGestureController extends PositionComponent
     // Check if cell is occupied by another path
     for (final entry in _allPaths.entries) {
       if (entry.key == pairId) continue;
-      if (_visitedCellsPerPath[entry.key]!.contains(_cellKey(cell))) {
+      // FIX #4: Safe lookup — guard against _visitedCellsPerPath being out of
+      // sync with _allPaths (e.g. if a path was added but the set was not yet
+      // initialised). Treat missing as empty.
+      if ((_visitedCellsPerPath[entry.key] ?? {}).contains(_cellKey(cell))) {
         return false; // Cell occupied by another path
       }
     }
@@ -357,6 +427,7 @@ class DotsGestureController extends PositionComponent
   void reset() {
     _allPaths.clear();
     _visitedCellsPerPath.clear();
+    _completedPairIds.clear();
     _currentPairId = null;
     _isDrawing = false;
     _currentDragPosition = null;

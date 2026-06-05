@@ -7,6 +7,7 @@ import '../../flame/puzzle_game.dart';
 import '../../models/puzzle.dart';
 import '../../models/grid_cell.dart';
 import '../../providers/puzzle_provider.dart';
+import '../../providers/puzzle_stats_provider.dart';
 import '../../services/ad_service.dart';
 import '../../widgets/banner_ad_widget.dart';
 
@@ -134,6 +135,11 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
       _isTimerRunning = false;
       _isShowingCompletionDialog = true;
     });
+
+    // Increment completed puzzles count for practice mode
+    if (widget.isPractice) {
+      await ref.read(puzzleStatsProvider.notifier).markPuzzleCompleted();
+    }
 
     if (!widget.isPractice && widget.puzzleId != null) {
       await ref.read(puzzleProvider.notifier).submitSolution(
@@ -318,7 +324,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
               
               Text(
                 widget.isPractice
-                    ? ''
+                    ? 'Good Work'
                     : ' Solution submitted successfully!',
                 style: TextStyle(
                   fontSize: 15,
@@ -372,13 +378,10 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.play_arrow_rounded, size: 20),
+                        const Icon(
+                          Icons.skip_next_rounded,
+                          size: 24,
+                          color: Colors.white,
                         ),
                         const SizedBox(width: 12),
                         const Text(

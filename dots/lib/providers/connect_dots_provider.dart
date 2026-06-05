@@ -1,9 +1,12 @@
-import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connect_dots_puzzle.dart';
 import '../models/color_dot.dart';
 import '../services/connect_dots_service.dart';
 import 'service_providers.dart';
+
+// Private sentinel: distinguishes "caller did not supply error" from
+// "caller explicitly passed null to clear the error".
+const Object _kKeepError = Object();
 
 class ConnectDotsState {
   final ConnectDotsPuzzle? puzzle;
@@ -20,22 +23,34 @@ class ConnectDotsState {
     this.practiceSolutionPaths = const [],
   });
 
+  /// BUG FIX: The original `copyWith` used `error: error` which ALWAYS
+  /// overwrote the stored error, even when the caller omitted the argument
+  /// (Dart defaults it to null). This meant `state.copyWith(isLoading: false)`
+  /// silently cleared any active error string.
+  ///
+  /// Solution: use a private sentinel constant so we can tell the difference
+  /// between "caller passed nothing" (_kKeepError) and "caller explicitly
+  /// passed null to clear the error".
   ConnectDotsState copyWith({
     ConnectDotsPuzzle? puzzle,
     bool? isLoading,
-    String? error,
+    Object? error = _kKeepError, // sentinel default
     PuzzleResult? lastResult,
     List<SolutionPath>? practiceSolutionPaths,
   }) {
     return ConnectDotsState(
       puzzle: puzzle ?? this.puzzle,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      // Only replace error when the caller explicitly supplied a value.
+      error: identical(error, _kKeepError) ? this.error : error as String?,
       lastResult: lastResult ?? this.lastResult,
       practiceSolutionPaths:
           practiceSolutionPaths ?? this.practiceSolutionPaths,
     );
   }
+
+  /// Convenience: explicitly clear the error without touching other fields.
+  ConnectDotsState clearError() => copyWith(error: null);
 }
 
 class ConnectDotsNotifier extends StateNotifier<ConnectDotsState> {
@@ -81,12 +96,22 @@ class ConnectDotsNotifier extends StateNotifier<ConnectDotsState> {
     }
   }
 
+  /// Generate a random puzzle from the server (random difficulty)
   Future<void> generateRandomPuzzle() async {
-    final rng = Random();
-    const difficulties = Difficulty.values;
-    final difficulty = difficulties[rng.nextInt(difficulties.length)];
-    final sequence = rng.nextInt(999) + 1;
-    await generatePracticePuzzle(difficulty, sequence);
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final puzzle = await _service.getRandomPuzzle();
+      state = ConnectDotsState(
+        puzzle: puzzle,
+        practiceSolutionPaths: puzzle.solutionPaths,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
   }
 
   Future<void> submitSolution(
@@ -104,6 +129,11 @@ class ConnectDotsNotifier extends StateNotifier<ConnectDotsState> {
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
+  }
+
+  /// Explicitly dismiss any active error without triggering a new load.
+  void clearError() {
+    state = state.clearError();
   }
 }
 

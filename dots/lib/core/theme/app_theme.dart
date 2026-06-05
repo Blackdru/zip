@@ -66,6 +66,12 @@ class AppTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+  
+  static LinearGradient accentGreenGradient = const LinearGradient(
+    colors: [Color(0xFF7BFF43), Color(0xFF4CAF50)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   static BoxDecoration glassCard = BoxDecoration(
     borderRadius: BorderRadius.circular(20),
