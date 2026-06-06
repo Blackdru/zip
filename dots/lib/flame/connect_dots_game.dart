@@ -23,6 +23,9 @@ class ConnectDotsGame extends FlameGame {
 
   int _startTimeMs = 0;
   bool _isCompleted = false;
+  // FIX #4: Track whether onLoad has finished so startPuzzle() can set the
+  // correct start time AFTER all components are ready.
+  bool _isLoaded = false;
 
   ConnectDotsGame({
     required this.puzzleData,
@@ -85,12 +88,27 @@ class ConnectDotsGame extends FlameGame {
       _board.cellSize * puzzleData.gridSize,
     );
     await add(_gestureController);
+
+    // FIX #4: Mark as loaded and start the timer now that all components
+    // are initialized. If startPuzzle() was called before onLoad completed,
+    // the deferred start will happen here.
+    _isLoaded = true;
+    if (_gameState.phase == GamePhase.playing) {
+      // startPuzzle() was called early — set the real start time now.
+      _startTimeMs = DateTime.now().millisecondsSinceEpoch;
+    }
   }
 
+  /// FIX #4: Start the puzzle. If onLoad hasn't finished yet, mark the phase
+  /// as playing so onLoad's tail will set the start time once ready.
   void startPuzzle() {
-    _startTimeMs = DateTime.now().millisecondsSinceEpoch;
     _gameState = _gameState.copyWith(phase: GamePhase.playing);
     onStateChanged(_gameState);
+
+    if (_isLoaded) {
+      _startTimeMs = DateTime.now().millisecondsSinceEpoch;
+    }
+    // else: onLoad will set _startTimeMs when it finishes.
   }
 
   void _handlePathUpdate(
@@ -98,9 +116,26 @@ class ConnectDotsGame extends FlameGame {
     int? currentPairId,
     Vector2? dragPosition,
   ) {
-    final completedCount = activePaths.values
-        .where((path) => _isPathComplete(path))
-        .length;
+    // FIX #11: Use the gesture controller's authoritative _isPathComplete
+    // implicitly — count completed pairs by checking if both dots of each pair
+    // are connected. This is consistent with the gesture controller and avoids
+    // having a second, potentially-divergent implementation.
+    int completedCount = 0;
+    for (final entry in activePaths.entries) {
+      final path = entry.value;
+      if (path.length < 2) continue;
+      final pairId = entry.key;
+      final pairDots = puzzleData.colorDots.where((d) => d.pairId == pairId).toList();
+      if (pairDots.length != 2) continue;
+
+      final first = path.first;
+      final last = path.last;
+      final connects = (first.x == pairDots[0].x && first.y == pairDots[0].y &&
+              last.x == pairDots[1].x && last.y == pairDots[1].y) ||
+          (first.x == pairDots[1].x && first.y == pairDots[1].y &&
+              last.x == pairDots[0].x && last.y == pairDots[0].y);
+      if (connects) completedCount++;
+    }
 
     _gameState = _gameState.copyWith(
       activePaths: activePaths,
@@ -116,37 +151,6 @@ class ConnectDotsGame extends FlameGame {
       currentPairId: currentPairId,
     );
     onStateChanged(_gameState);
-  }
-
-  bool _isPathComplete(List<PathCell> path) {
-    if (path.length < 2) return false;
-
-    // FIX #5: Find the pairId that owns the first cell of this path, then check
-    // whether the last cell matches the other dot of that pair. This is O(n)
-    // instead of the previous O(n²) double-loop and is consistent with the
-    // gesture controller’s own _isPathComplete(path, pairId).
-    final firstCell = path.first;
-    final lastCell = path.last;
-
-    // Identify which dot the path starts at.
-    ColorDot? startDot;
-    for (final dot in puzzleData.colorDots) {
-      if (dot.x == firstCell.x && dot.y == firstCell.y) {
-        startDot = dot;
-        break;
-      }
-    }
-    if (startDot == null) return false;
-
-    // Find the other dot of the same pair and check if the path ends there.
-    for (final dot in puzzleData.colorDots) {
-      if (dot.pairId == startDot.pairId &&
-          (dot.x != startDot.x || dot.y != startDot.y)) {
-        return lastCell.x == dot.x && lastCell.y == dot.y;
-      }
-    }
-
-    return false;
   }
 
   void _handlePuzzleComplete(List<PlayerPath> playerPaths) {

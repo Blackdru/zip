@@ -32,6 +32,10 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   Timer? _timer;
   bool _isShowingCompletionDialog = false;
 
+  // FIX #9: Track last-known display values so we only rebuild when they change.
+  int _lastCompletedPairs = 0;
+  GamePhase _lastPhase = GamePhase.idle;
+
   @override
   void initState() {
     super.initState();
@@ -81,7 +85,15 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   }
 
   void _handleStateChanged(GameState state) {
-    setState(() {});
+    // FIX #9: Only rebuild the widget tree when values shown in the AppBar
+    // actually change. During active drawing, the game fires onStateChanged
+    // for every cell crossed (30-60 times/sec), but only completedPairs and
+    // phase are visible in this screen — skip the rebuild otherwise.
+    if (state.completedPairs != _lastCompletedPairs || state.phase != _lastPhase) {
+      _lastCompletedPairs = state.completedPairs;
+      _lastPhase = state.phase;
+      if (mounted) setState(() {});
+    }
   }
 
   void _handlePathConflict() {
@@ -214,8 +226,10 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              context.pop(); // Close dialog
-              context.pop(); // Back to practice screen
+              // FIX #12: Use context.go() instead of double context.pop().
+              // The double-pop assumed a specific stack depth which could
+              // break with deep links or stack manipulation.
+              context.go('/practice');
             },
             child: const Text('BACK'),
           ),

@@ -26,7 +26,7 @@ class PuzzleStatsNotifier extends StateNotifier<PuzzleStatsState> {
   PuzzleStatsNotifier(this._statsService)
       : super(PuzzleStatsState(
           totalCompleted: _statsService.getTotalCompletedPuzzles(),
-        ));
+        ),);
   
   /// Mark a puzzle as completed
   Future<void> markPuzzleCompleted() async {

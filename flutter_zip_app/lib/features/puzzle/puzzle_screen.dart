@@ -375,16 +375,16 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                       ),
                       elevation: 0,
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.skip_next_rounded,
                           size: 24,
                           color: Colors.white,
                         ),
-                        const SizedBox(width: 12),
-                        const Text(
+                        SizedBox(width: 12),
+                        Text(
                           'NEXT PUZZLE',
                           style: TextStyle(
                             fontSize: 16,

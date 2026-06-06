@@ -5,7 +5,7 @@ class ApiConfig {
   // - 'emulator': Use 10.0.2.2 for Android emulator
   // - 'physical': Use your computer's local IP address
   // - 'production': Use production server
-  static const String environment = 'emulator'; // Change to 'physical' if using real device
+  static const String environment = 'production'; // Use production for release builds
   
   // Your computer's local IP address (for physical devices)
   // Find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
@@ -26,4 +26,10 @@ class ApiConfig {
         }
     }
   }
+  
+  // Helper method to check if using production
+  static bool get isProduction => environment == 'production';
+  
+  // Helper method to check if using secure connection
+  static bool get isSecure => baseUrl.startsWith('https');
 }

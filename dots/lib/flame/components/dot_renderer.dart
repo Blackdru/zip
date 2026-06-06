@@ -1,24 +1,13 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import '../../models/color_dot.dart';
+import '../../core/theme/dot_colors.dart';
 
 /// Renders colored dots on the board
 class DotRenderer extends PositionComponent {
   final int gridSize;
   final double cellSize;
   final List<ColorDot> colorDots;
-
-  // Color mapping for dots
-  final Map<String, Color> _colorMap = {
-    'red': const Color(0xFFFF5543),
-    'blue': const Color(0xFF43C6FF),
-    'green': const Color(0xFF7BFF43),
-    'yellow': const Color(0xFFFFC043),
-    'orange': const Color(0xFFFF8A43),
-    'purple': const Color(0xFFB843FF),
-    'cyan': const Color(0xFF43FFFF),
-    'pink': const Color(0xFFFF43B8),
-  };
 
   DotRenderer({
     required this.gridSize,
@@ -45,7 +34,8 @@ class DotRenderer extends PositionComponent {
       final center = Offset(centerX, centerY);
       final radius = cellSize * 0.32;
 
-      final color = _colorMap[dot.color] ?? const Color(0xFFFFFFFF);
+      // FIX #7: Use shared DotColors instead of local duplicate map.
+      final color = DotColors.resolve(dot.color);
 
       // Subtle outer glow (reduced significantly)
       final outerGlowPaint = Paint()

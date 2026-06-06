@@ -18,26 +18,26 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
   @override
   void initState() {
     super.initState();
-    // Automatically load a random puzzle when screen opens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startRandomPuzzle();
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final puzzleState = ref.watch(connectDotsProvider);
     final statsState = ref.watch(puzzleStatsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Connect Dots'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, size: 26),
+            color: Colors.white70,
+            onPressed: () => context.push('/settings'),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: _isLoading || puzzleState.isLoading
+      body: _isLoading
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

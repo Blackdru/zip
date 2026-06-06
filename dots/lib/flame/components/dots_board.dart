@@ -25,9 +25,13 @@ class DotsBoard extends PositionComponent with HasGameReference {
     boardSize = availableSize - (padding * 2);
     cellSize = boardSize / gridSize;
 
+    // FIX #8: Dynamically position the board instead of using a magic -30 offset.
+    // Place the board centered horizontally and shifted slightly upward
+    // proportional to the screen height so it adapts to different device sizes.
+    final verticalOffset = gameSize.y * 0.04; // ~4% of screen height
     position = Vector2(
       (gameSize.x - boardSize) / 2,
-      (gameSize.y - boardSize) / 2 - 30,
+      (gameSize.y - boardSize) / 2 - verticalOffset,
     );
 
     size = Vector2(boardSize, boardSize);

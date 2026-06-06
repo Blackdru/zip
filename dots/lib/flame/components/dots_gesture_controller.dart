@@ -27,6 +27,9 @@ class DotsGestureController extends PositionComponent
   bool _isDrawing = false;
   Vector2? _currentDragPosition;
 
+  // FIX #10: Flag to block all gestures after puzzle completion.
+  bool _puzzleCompleted = false;
+
   DotsGestureController({
     required this.gridSize,
     required this.cellSize,
@@ -45,6 +48,9 @@ class DotsGestureController extends PositionComponent
   @override
   void onDragStart(DragStartEvent event) {
     super.onDragStart(event);
+
+    // FIX #10: Block all gestures after puzzle is completed.
+    if (_puzzleCompleted) return;
 
     final cell = _screenToGrid(event.localPosition);
     if (cell == null) return;
@@ -162,6 +168,9 @@ class DotsGestureController extends PositionComponent
   void onDragUpdate(DragUpdateEvent event) {
     super.onDragUpdate(event);
 
+    // FIX #10: Block gestures after puzzle completion.
+    if (_puzzleCompleted) return;
+
     // CRITICAL: Only process if actively drawing and have a current pair
     if (!_isDrawing || _currentPairId == null) return;
 
@@ -186,12 +195,13 @@ class DotsGestureController extends PositionComponent
       return;
     }
 
-    // IMPORTANT: Verify we're not trying to interact with a different pair's dot
+    // FIX #2: When dragging over a different pair's dot, DON'T kill the current
+    // path. Simply treat it as an impassable cell and let the user keep drawing.
+    // The path just won't extend into that cell.
     final dotAtCell = _getDotAtCell(cell);
     if (dotAtCell != null && dotAtCell.pairId != _currentPairId) {
-      // Dragging over a different pair's dot - ignore but stop drawing
-      _currentDragPosition = null;
-      _finishPath();
+      // Dragging over a different pair's dot — skip this cell, keep drawing.
+      onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
       return;
     }
 
@@ -219,35 +229,140 @@ class DotsGestureController extends PositionComponent
       }
     }
 
-    // Not backtracking to immediate previous cell - try to add new cell (forward movement only)
-    if (_isValidMove(cell, _currentPairId!)) {
-      currentPath.add(PathCell(x: cell.x, y: cell.y));
-      _visitedCellsPerPath[_currentPairId]!.add(_cellKey(cell));
-      
-      // Check if path just became complete
-      if (_isPathComplete(currentPath, _currentPairId!)) {
-        // Path is now complete, finish and lock immediately
-        _currentDragPosition = null;
-        _finishPath();
-        return;
+    // FIX #1: Interpolate intermediate cells to handle fast drags.
+    // Instead of only accepting adjacent cells, walk from the last cell toward
+    // the target cell along a straight line (horizontal or vertical only).
+    // If the target is diagonal, try horizontal-first then vertical-first.
+    if (_isAdjacent(currentPath.last, cell)) {
+      // Direct neighbor — fast path, no interpolation needed.
+      if (_isValidMove(cell, _currentPairId!)) {
+        _addCellToPath(cell, currentPath);
+      } else {
+        _handleInvalidMove(cell);
       }
-      
-      onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
     } else {
-      // Invalid move - show conflict if trying to cross another path
-      final cellKey = _cellKey(cell);
-      for (final entry in _allPaths.entries) {
-        if (entry.key != _currentPairId &&
-            // FIX #4: Safe lookup — if the visited-cells set is missing for this
-            // entry (transient out-of-sync), treat it as empty rather than crash.
-            (_visitedCellsPerPath[entry.key] ?? {}).contains(cellKey)) {
-          onPathConflict?.call();
-          break;
-        }
-      }
-      // Keep drag position for visual feedback
-      onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
+      // Not adjacent — attempt to interpolate a path of cells between
+      // the current endpoint and the target cell.
+      _interpolateAndAdd(currentPath, cell);
     }
+  }
+
+  /// FIX #1: Walk from the last cell of [currentPath] toward [target],
+  /// adding each intermediate cell if it passes validation.
+  /// Tries horizontal-then-vertical first; if that fails at any step,
+  /// tries vertical-then-horizontal.
+  void _interpolateAndAdd(List<PathCell> currentPath, PathCell target) {
+    final start = currentPath.last;
+    final dx = target.x - start.x;
+    final dy = target.y - start.y;
+
+    // Build list of intermediate cells: horizontal first, then vertical.
+    List<PathCell> hFirstCells = _buildInterpolatedCells(start, target, true);
+    if (_tryAddCells(currentPath, hFirstCells)) return;
+
+    // If horizontal-first failed, try vertical-first.
+    List<PathCell> vFirstCells = _buildInterpolatedCells(start, target, false);
+    if (_tryAddCells(currentPath, vFirstCells)) return;
+
+    // Neither worked — show conflict feedback for the target cell.
+    _handleInvalidMove(target);
+  }
+
+  /// Build a list of cells from [start] to [target] (exclusive of start).
+  /// If [horizontalFirst] is true, move along X first then Y; otherwise Y first.
+  List<PathCell> _buildInterpolatedCells(PathCell start, PathCell target, bool horizontalFirst) {
+    final cells = <PathCell>[];
+    int cx = start.x;
+    int cy = start.y;
+
+    if (horizontalFirst) {
+      // Horizontal movement
+      final stepX = target.x > cx ? 1 : -1;
+      while (cx != target.x) {
+        cx += stepX;
+        cells.add(PathCell(x: cx, y: cy));
+      }
+      // Vertical movement
+      final stepY = target.y > cy ? 1 : -1;
+      while (cy != target.y) {
+        cy += stepY;
+        cells.add(PathCell(x: cx, y: cy));
+      }
+    } else {
+      // Vertical movement first
+      final stepY = target.y > cy ? 1 : -1;
+      while (cy != target.y) {
+        cy += stepY;
+        cells.add(PathCell(x: cx, y: cy));
+      }
+      // Horizontal movement
+      final stepX = target.x > cx ? 1 : -1;
+      while (cx != target.x) {
+        cx += stepX;
+        cells.add(PathCell(x: cx, y: cy));
+      }
+    }
+
+    return cells;
+  }
+
+  /// Try to add all [cells] to [currentPath]. Returns true if ALL cells were
+  /// successfully added. If any cell fails validation, rolls back ALL additions
+  /// from this batch and returns false.
+  bool _tryAddCells(List<PathCell> currentPath, List<PathCell> cells) {
+    final addedCells = <PathCell>[];
+
+    for (final cell in cells) {
+      if (_isValidMove(cell, _currentPairId!)) {
+        _addCellToPath(cell, currentPath);
+        addedCells.add(cell);
+
+        // If path just became complete, finish immediately.
+        if (_isPathComplete(currentPath, _currentPairId!)) {
+          _currentDragPosition = null;
+          _finishPath();
+          return true;
+        }
+      } else {
+        // Rollback all cells added in this batch.
+        for (final added in addedCells.reversed) {
+          currentPath.removeLast();
+          _visitedCellsPerPath[_currentPairId]?.remove(_cellKey(added));
+        }
+        return false;
+      }
+    }
+
+    onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
+    return true;
+  }
+
+  /// Helper: add a single cell to the current path and its visited set.
+  void _addCellToPath(PathCell cell, List<PathCell> currentPath) {
+    currentPath.add(PathCell(x: cell.x, y: cell.y));
+    _visitedCellsPerPath[_currentPairId]!.add(_cellKey(cell));
+  }
+
+  /// Helper: check if two cells are orthogonally adjacent.
+  bool _isAdjacent(PathCell a, PathCell b) {
+    final dx = (a.x - b.x).abs();
+    final dy = (a.y - b.y).abs();
+    return (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+  }
+
+  /// Handle an invalid move attempt — show conflict feedback if the cell
+  /// is occupied by another path.
+  void _handleInvalidMove(PathCell cell) {
+    final cellKey = _cellKey(cell);
+    for (final entry in _allPaths.entries) {
+      if (entry.key != _currentPairId &&
+          (_visitedCellsPerPath[entry.key] ?? {}).contains(cellKey)) {
+        onPathConflict?.call();
+        break;
+      }
+    }
+    // Keep drag position for visual feedback
+    onPathUpdate(_allPaths, _currentPairId, _currentDragPosition);
   }
 
   @override
@@ -280,6 +395,9 @@ class DotsGestureController extends PositionComponent
 
     // Check if puzzle is complete
     if (_validateCompletePuzzle()) {
+      // FIX #10: Mark puzzle as completed to block further gestures.
+      _puzzleCompleted = true;
+
       final playerPaths = _allPaths.entries
           .map((entry) => PlayerPath(pairId: entry.key, path: entry.value))
           .toList();
@@ -431,6 +549,7 @@ class DotsGestureController extends PositionComponent
     _currentPairId = null;
     _isDrawing = false;
     _currentDragPosition = null;
+    _puzzleCompleted = false; // FIX #10: Reset completion flag on puzzle reset.
     onPathUpdate(_allPaths, null, null);
   }
 

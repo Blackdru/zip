@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Production - Only HTTPS -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">zip.robotpdf.com</domain>
+    </domain-config>
+    
+    <!-- Development - Allow HTTP for local testing -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- For emulator -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- For physical devices - local network -->
+        <domain includeSubdomains="true">192.168.1.100</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+</network-security-config>

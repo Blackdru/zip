@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -39,6 +40,20 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
           
           _buildSection(
+            'Legal',
+            [
+              _buildTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Privacy Policy',
+                subtitle: 'View our privacy policy',
+                onTap: () => _launchPrivacyPolicy(),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 24),
+          
+          _buildSection(
             'Support',
             [
               _buildTile(
@@ -58,6 +73,13 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _launchPrivacyPolicy() async {
+    final uri = Uri.parse('https://robotpdf.com/apps/connectdots');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildSection(String title, List<Widget> children) {

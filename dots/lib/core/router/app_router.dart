@@ -1,16 +1,16 @@
 import 'package:go_router/go_router.dart';
-import '../../features/home/home_screen.dart';
+import '../../features/splash/splash_screen.dart';
 import '../../features/practice/practice_screen.dart';
 import '../../features/puzzle/connect_dots_screen.dart';
 import '../../features/settings/settings_screen.dart';
 
 final appRouter = GoRouter(
-  initialLocation: '/home',
+  initialLocation: '/splash',
   routes: [
     GoRoute(
-      path: '/home',
-      name: 'home',
-      builder: (context, state) => const HomeScreen(),
+      path: '/splash',
+      name: 'splash',
+      builder: (context, state) => const SplashScreen(),
     ),
     GoRoute(
       path: '/practice',

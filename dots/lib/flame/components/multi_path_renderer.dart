@@ -1,6 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart' hide Image;
 import '../../models/color_dot.dart';
+import '../../core/theme/dot_colors.dart';
 
 /// Renders multiple paths simultaneously, each with its own color
 class MultiPathRenderer extends PositionComponent {
@@ -14,18 +15,6 @@ class MultiPathRenderer extends PositionComponent {
   // for that pair, not for every path in the map.
   int? _currentActivePairId;
   late double pathWidth;
-
-  // Color mapping for dots
-  final Map<String, Color> _colorMap = {
-    'red': const Color(0xFFFF5543),
-    'blue': const Color(0xFF43C6FF),
-    'green': const Color(0xFF7BFF43),
-    'yellow': const Color(0xFFFFC043),
-    'orange': const Color(0xFFFF8A43),
-    'purple': const Color(0xFFB843FF),
-    'cyan': const Color(0xFF43FFFF),
-    'pink': const Color(0xFFFF43B8),
-  };
 
   MultiPathRenderer({
     required this.gridSize,
@@ -48,7 +37,11 @@ class MultiPathRenderer extends PositionComponent {
     // Only that pair should show the preview extension toward the finger.
     int? currentPairId,
   }) {
-    _activePaths = Map.from(paths);
+    // FIX #3: Deep-copy both the map and each inner list so the renderer
+    // holds an independent snapshot. The gesture controller mutates its lists
+    // in-place (e.g. backtracking removes the last element), which could
+    // cause the renderer to see inconsistent state mid-frame with a shallow copy.
+    _activePaths = paths.map((k, v) => MapEntry(k, List<PathCell>.from(v)));
     _currentDragPosition = dragPosition;
     _currentActivePairId = currentPairId;
   }
@@ -71,9 +64,9 @@ class MultiPathRenderer extends PositionComponent {
       final path = entry.value;
       if (path.isEmpty) continue;
 
-      // Get color for this pair
+      // FIX #7: Use shared DotColors instead of a local duplicate map.
       final dot = colorDots.firstWhere((d) => d.pairId == pairId);
-      final color = _colorMap[dot.color] ?? const Color(0xFFFFFFFF);
+      final color = DotColors.resolve(dot.color);
 
       _drawPath(canvas, path, color, pairId);
     }
@@ -89,12 +82,12 @@ class MultiPathRenderer extends PositionComponent {
 
     final points = path.map((cell) => _getCellCenter(cell)).toList();
 
-    // BUG FIX: Only extend the path toward the drag position for the pair that
-    // is CURRENTLY being drawn. The old check (_activePaths[pairId] == path)
-    // was always true because both sides reference the same map value, so every
-    // path got a preview tail drawn toward the finger position, causing:
-    //   • Completed paths to visually extend while drawing another pair.
-    //   • Idle paths to sprout a floating segment from their last cell.
+    // FIX #6: Only extend the path toward the drag position when:
+    //   1. There IS an active drag position
+    //   2. This pair IS the one currently being drawn
+    // When a path completes, _finishPath() sets _currentDragPosition to null
+    // and _currentActivePairId to null BEFORE calling updatePaths, so the
+    // preview tail is never rendered for completed/idle paths.
     if (_currentDragPosition != null && pairId == _currentActivePairId) {
       final lastPoint = points.last;
       final clampedX = _currentDragPosition!.x.clamp(0.0, cellSize * gridSize);
