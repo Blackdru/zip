@@ -274,6 +274,61 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
     _startTimer();
   }
 
+  void _showHint() {
+    final puzzleState = ref.read(connectDotsProvider);
+    final puzzle = puzzleState.puzzle;
+    if (puzzle == null || _game == null) return;
+
+    final solutionPaths = puzzle.solutionPaths;
+    if (solutionPaths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No hints available for this puzzle'),
+          backgroundColor: AppTheme.primaryPurple,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final activePaths = _game!.gameState.activePaths;
+    final colorDots = puzzle.colorDots;
+
+    int? targetPairId;
+    int pairLabel = 1;
+
+    final pairIds = colorDots.map((d) => d.pairId).toSet().toList()..sort();
+    for (int i = 0; i < pairIds.length; i++) {
+      final pid = pairIds[i];
+      final path = activePaths[pid];
+      bool isCompleted = false;
+      if (path != null && path.length >= 2) {
+        final pairDots = colorDots.where((d) => d.pairId == pid).toList();
+        if (pairDots.length == 2) {
+          final first = path.first;
+          final last = path.last;
+          isCompleted = (first.x == pairDots[0].x && first.y == pairDots[0].y &&
+                  last.x == pairDots[1].x && last.y == pairDots[1].y) ||
+              (first.x == pairDots[1].x && first.y == pairDots[1].y &&
+                  last.x == pairDots[0].x && last.y == pairDots[0].y);
+        }
+      }
+      if (!isCompleted) {
+        targetPairId = pid;
+        pairLabel = i + 1;
+        break;
+      }
+    }
+
+    if (targetPairId != null) {
+      final solution = solutionPaths.firstWhere(
+        (s) => s.pairId == targetPairId,
+        orElse: () => solutionPaths.first,
+      );
+      _game!.showPathHint(solution, pairLabel);
+    }
+  }
+
   Future<void> _startNewPuzzle() async {
     final puzzleState = ref.read(connectDotsProvider);
     if (puzzleState.puzzle != null) {
@@ -365,6 +420,12 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
           ],
         ),
         actions: [
+          // Hint button
+          IconButton(
+            icon: const Icon(Icons.lightbulb_outline),
+            tooltip: 'Hint',
+            onPressed: _showHint,
+          ),
           // Reset button
           IconButton(
             icon: const Icon(Icons.refresh),

@@ -6,6 +6,7 @@ import 'components/dots_board.dart';
 import 'components/multi_path_renderer.dart';
 import 'components/dot_renderer.dart';
 import 'components/dots_gesture_controller.dart';
+import 'components/hint_renderer.dart';
 
 /// Main Flame game class for Connect Dots puzzle
 class ConnectDotsGame extends FlameGame {
@@ -18,6 +19,7 @@ class ConnectDotsGame extends FlameGame {
   late MultiPathRenderer _pathRenderer;
   late DotRenderer _dotRenderer;
   late DotsGestureController _gestureController;
+  late HintRenderer _hintRenderer;
 
   GameState _gameState = const GameState(totalPairs: 0);
 
@@ -43,6 +45,7 @@ class ConnectDotsGame extends FlameGame {
 
     _gameState = GameState(
       totalPairs: puzzleData.totalPairs,
+      phase: _gameState.phase,
     );
 
     // Board renderer
@@ -71,6 +74,15 @@ class ConnectDotsGame extends FlameGame {
     );
     _dotRenderer.position = _board.position;
     await add(_dotRenderer);
+
+    // Hint renderer (on very top)
+    _hintRenderer = HintRenderer(
+      gridSize: puzzleData.gridSize,
+      cellSize: _board.cellSize,
+      colorDots: puzzleData.colorDots,
+    );
+    _hintRenderer.position = _board.position;
+    await add(_hintRenderer);
 
     // Gesture controller
     _gestureController = DotsGestureController(
@@ -116,6 +128,9 @@ class ConnectDotsGame extends FlameGame {
     int? currentPairId,
     Vector2? dragPosition,
   ) {
+    if (currentPairId != null) {
+      _hintRenderer.clearHint();
+    }
     // FIX #11: Use the gesture controller's authoritative _isPathComplete
     // implicitly — count completed pairs by checking if both dots of each pair
     // are connected. This is consistent with the gesture controller and avoids
@@ -173,6 +188,7 @@ class ConnectDotsGame extends FlameGame {
 
   void reset() {
     _gestureController.reset();
+    _hintRenderer.clearHint();
     _startTimeMs = DateTime.now().millisecondsSinceEpoch;
     _isCompleted = false;
     _gameState = GameState(
@@ -182,9 +198,16 @@ class ConnectDotsGame extends FlameGame {
     onStateChanged(_gameState);
   }
 
-  void showHint(int pairId, PathCell nextCell) {
-    // TODO: Implement hint visualization
-    // Show pulsing circle on the next cell for this path
+  void showPathHint(SolutionPath solutionPath, int pairLabel) {
+    if (solutionPath.path.isEmpty) return;
+    final startCell = solutionPath.path.first;
+    final remainingCells = solutionPath.path.sublist(1);
+    _hintRenderer.showHint(
+      solutionPath.pairId,
+      startCell,
+      remainingCells,
+      pairLabel,
+    );
   }
 
   GameState get gameState => _gameState;

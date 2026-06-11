@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flame/game.dart';
@@ -28,8 +29,11 @@ class PuzzleScreen extends ConsumerStatefulWidget {
 class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
   PuzzleGame? _game;
   int _elapsedSeconds = 0;
-  bool _isTimerRunning = false;
+  Timer? _timer;
   bool _isShowingCompletionDialog = false; // Prevent multiple dialogs
+
+  // Guard flag to prevent rapid-fire resets causing multiple timers.
+  bool _isResetting = false;
 
   // Hint state (only used to style the AppBar 'Hint' text)
   bool _hintActive = false;
@@ -94,32 +98,46 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
         action: SnackBarAction(
           label: 'RESET',
           textColor: Colors.white,
-          onPressed: () {
-            _game?.reset();
-            setState(() {
-              _elapsedSeconds = 0;
-              _isTimerRunning = false;
-              _isShowingCompletionDialog = false;
-            });
-            _startTimer();
-            Future.microtask(() => _game?.startPuzzle());
-          },
+          onPressed: _resetPuzzle,
         ),
       ),
     );
   }
 
   void _startTimer() {
+    // Cancel any existing timer before starting a new one.
+    _timer?.cancel();
     setState(() {
-      _isTimerRunning = true;
       _elapsedSeconds = 0;
     });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _elapsedSeconds++);
+      }
+    });
+  }
 
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted || !_isTimerRunning) return false;
-      setState(() => _elapsedSeconds++);
-      return true;
+  /// Reset the puzzle — guarded against rapid-fire taps.
+  void _resetPuzzle() {
+    if (_isResetting) return;
+    _isResetting = true;
+
+    // Cancel the timer FIRST, before any state changes.
+    _timer?.cancel();
+    _timer = null;
+
+    _game?.reset();
+    setState(() {
+      _elapsedSeconds = 0;
+      _hintActive = false;
+      _isShowingCompletionDialog = false;
+    });
+    _startTimer();
+    Future.microtask(() => _game?.startPuzzle());
+
+    // Cooldown: block further resets for 300ms.
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _isResetting = false;
     });
   }
 
@@ -131,8 +149,8 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     // if startPuzzle() was not called in time, so we use the Flutter timer for display.
     final displayTimeMs = _elapsedSeconds * 1000;
 
+    _timer?.cancel();
     setState(() {
-      _isTimerRunning = false;
       _isShowingCompletionDialog = true;
     });
 
@@ -166,37 +184,79 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
     final solutionPath = ref.read(puzzleProvider).practiceSolutionPath;
     final currentPath = gameState.currentPath;
 
-    if (solutionPath.isEmpty) return;
+    if (solutionPath.isEmpty) {
+      _showHintSnackBar('Hints not available for this puzzle');
+      return;
+    }
 
-    // Find the longest matching prefix between current path and solution path
+    // Find the longest matching prefix between current path and solution.
     int matchingLength = 0;
     for (int i = 0; i < currentPath.length && i < solutionPath.length; i++) {
-      final current = currentPath[i];
-      final solution = solutionPath[i];
-      if (current.x == solution.x && current.y == solution.y) {
+      if (currentPath[i].x == solutionPath[i].x &&
+          currentPath[i].y == solutionPath[i].y) {
         matchingLength = i + 1;
       } else {
-        // Stop at first mismatch
         break;
       }
     }
 
-    // The next hint is the cell right after the longest matching sequence
-    final nextIdx = matchingLength;
-    
-    if (nextIdx < solutionPath.length) {
-      final next = solutionPath[nextIdx];
-      final cell = GridCell(x: next.x, y: next.y);
+    final bool hasDiverged = matchingLength < currentPath.length;
 
-      // Delegate rendering to Flame — uses exact board coordinates
-      _game!.showHint(cell);
+    if (hasDiverged) {
+      // Player took a wrong turn — tell them how many steps to undo.
+      final stepsToUndo = currentPath.length - matchingLength;
+      _game!.showHintDiverged(stepsToUndo);
 
-      // Style the Hint button text for 3 seconds
-      setState(() => _hintActive = true);
-      Future.delayed(const Duration(milliseconds: 3000), () {
-        if (mounted) setState(() => _hintActive = false);
-      });
+      _showHintSnackBar(
+        'Wrong path! Go back $stepsToUndo ${stepsToUndo == 1 ? "step" : "steps"} and follow the hint arrows',
+      );
+    } else {
+      // Player is on the correct path — show next cells with arrows.
+      final startIdx = matchingLength;
+      if (startIdx >= solutionPath.length) {
+        _showHintSnackBar('You\'re on the right track!');
+        return;
+      }
+
+      // Collect up to 3 next cells to show.
+      final hintCells = <GridCell>[];
+      final count = (solutionPath.length - startIdx).clamp(0, 3);
+      for (int i = 0; i < count; i++) {
+        final step = solutionPath[startIdx + i];
+        hintCells.add(GridCell(x: step.x, y: step.y));
+      }
+
+      // Also pass the "from" cell (where user currently is).
+      final fromCell = currentPath.isNotEmpty
+          ? currentPath.last
+          : GridCell(x: solutionPath[0].x, y: solutionPath[0].y);
+
+      _game!.showDirectionalHint(fromCell, hintCells);
     }
+
+    // Style the Hint button for 4 seconds.
+    setState(() => _hintActive = true);
+    Future.delayed(const Duration(milliseconds: 4000), () {
+      if (mounted) setState(() => _hintActive = false);
+    });
+  }
+
+  void _showHintSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+        ),
+        backgroundColor: const Color(0xFF92400E),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   // ─── Completion Dialog ────────────────────────────────────────────────────
@@ -353,9 +413,9 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
                           if (mounted) {
                             final puzzleState = ref.read(puzzleProvider);
                             if (puzzleState.puzzle != null) {
+                              _timer?.cancel();
                               setState(() {
                                 _elapsedSeconds = 0;
-                                _isTimerRunning = false;
                                 _hintActive = false;
                               });
                               _initializeGame(puzzleState.puzzle!);
@@ -538,17 +598,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
           // Reset button
           if (_game != null)
             GestureDetector(
-              onTap: () {
-                _game?.reset();
-                setState(() {
-                  _elapsedSeconds = 0;
-                  _isTimerRunning = false;
-                  _hintActive = false;
-                  _isShowingCompletionDialog = false;
-                });
-                _startTimer();
-                Future.microtask(() => _game?.startPuzzle());
-              },
+              onTap: _resetPuzzle,
               child: Container(
                 margin: const EdgeInsets.only(right: 16, top: 2, bottom: 2),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -766,7 +816,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
 
   @override
   void dispose() {
-    _isTimerRunning = false;
+    _timer?.cancel();
     // Clear any snackbars when leaving the puzzle screen
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();

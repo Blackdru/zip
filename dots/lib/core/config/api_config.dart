@@ -2,10 +2,11 @@ import 'dart:io' show Platform;
 
 class ApiConfig {
   // Change this to match your setup:
+  // - 'development': Use localhost for development
   // - 'emulator': Use 10.0.2.2 for Android emulator
   // - 'physical': Use your computer's local IP address
   // - 'production': Use production server
-  static const String environment = 'production'; // Use production for release builds
+  static const String environment = 'emulator'; // Change based on your testing environment
   
   // Your computer's local IP address (for physical devices)
   // Find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
@@ -13,6 +14,8 @@ class ApiConfig {
   
   static String get baseUrl {
     switch (environment) {
+      case 'development':
+        return 'http://localhost:2020/api/v1';
       case 'physical':
         return 'http://$localIpAddress:2020/api/v1';
       case 'production':

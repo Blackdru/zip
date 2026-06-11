@@ -30,9 +30,9 @@ interface DifficultyParams {
 }
 
 const DIFFICULTY_PARAMS: Record<Difficulty, DifficultyParams> = {
-  easy: { gridSize: 5, minPairs: 3, maxPairs: 4 },
-  medium: { gridSize: 6, minPairs: 4, maxPairs: 5 },
-  hard: { gridSize: 7, minPairs: 5, maxPairs: 6 },
+  easy: { gridSize: 6, minPairs: 3, maxPairs: 3 },
+  medium: { gridSize: 7, minPairs: 4, maxPairs: 5 },
+  hard: { gridSize: 8, minPairs: 6, maxPairs: 7 },
 };
 
 // Available colors for dots
@@ -150,6 +150,9 @@ export class ConnectDotsEngine {
   /**
    * Generates space-filling paths via backtracking.
    * Returns paths and their endpoint dots.
+   *
+   * Uses Warnsdorff's heuristic (prefer cells with fewer unvisited neighbors)
+   * to dramatically reduce dead-ends, especially on larger grids (8×8).
    */
   private static generateSpaceFillingPaths(
     gridSize: number,
@@ -160,8 +163,8 @@ export class ConnectDotsEngine {
     const grid: number[][] = Array(gridSize).fill(0).map(() => Array(gridSize).fill(-1));
     const paths: Map<number, Array<{ x: number; y: number }>> = new Map();
 
-    let iteration = 0;
-    const maxIterations = 100000;
+    // Scale iteration budget with grid area — larger grids need exponentially more work
+    const maxIterations = Math.max(200000, totalCells * totalCells * 800);
 
     const isValid = (x: number, y: number): boolean => {
       return x >= 0 && x < gridSize && y >= 0 && y < gridSize && grid[y][x] === -1;
@@ -179,11 +182,59 @@ export class ConnectDotsEngine {
       return neighbors;
     };
 
+    /** Warnsdorff degree: count unvisited neighbors of a cell */
+    const warnsdorffDegree = (x: number, y: number): number => {
+      let count = 0;
+      for (const { dx, dy } of DIRECTIONS) {
+        if (isValid(x + dx, y + dy)) count++;
+      }
+      return count;
+    };
+
+    /**
+     * Check that all empty cells remain reachable from each other
+     * (i.e., no isolated pockets). Uses simple flood-fill.
+     */
+    const isConnected = (): boolean => {
+      // Find first empty cell
+      let startX = -1, startY = -1;
+      let emptyCount = 0;
+      outer:
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          if (grid[y][x] === -1) {
+            if (startX === -1) { startX = x; startY = y; }
+            emptyCount++;
+          }
+        }
+      }
+      if (emptyCount <= 1) return true;
+
+      // Flood fill
+      const visited = new Set<string>();
+      const queue: Array<{ x: number; y: number }> = [{ x: startX, y: startY }];
+      visited.add(`${startX},${startY}`);
+      while (queue.length > 0) {
+        const { x, y } = queue.shift()!;
+        for (const { dx, dy } of DIRECTIONS) {
+          const nx = x + dx, ny = y + dy;
+          const key = `${nx},${ny}`;
+          if (isValid(nx, ny) && !visited.has(key)) {
+            visited.add(key);
+            queue.push({ x: nx, y: ny });
+          }
+        }
+      }
+      return visited.size === emptyCount;
+    };
+
+    let iteration = 0;
+
     const buildPath = (pairId: number, remainingCells: number): boolean => {
       iteration++;
       if (iteration > maxIterations) return false;
 
-      // Find random starting point
+      // Find all empty cells
       const emptyCells: Array<{ x: number; y: number }> = [];
       for (let y = 0; y < gridSize; y++) {
         for (let x = 0; x < gridSize; x++) {
@@ -193,27 +244,22 @@ export class ConnectDotsEngine {
 
       if (emptyCells.length === 0) return true; // All filled
 
-      // Choose random start (prefer corners/edges for last few paths)
-      const isLastPairs = pairId > pairCount - 2;
-      let start: { x: number; y: number };
-      
-      if (isLastPairs) {
-        // Prefer positions with fewer neighbors to avoid dead-ends
-        const cellsWithNeighborCount = emptyCells.map(cell => ({
-          cell,
-          neighbors: getUnvisitedNeighbors(cell.x, cell.y).length
-        }));
-        cellsWithNeighborCount.sort((a, b) => a.neighbors - b.neighbors);
-        const pickFrom = cellsWithNeighborCount.slice(0, Math.max(1, Math.floor(cellsWithNeighborCount.length * 0.3)));
-        start = pickFrom[rng.nextInt(0, pickFrom.length - 1)].cell;
-      } else {
-        start = emptyCells[rng.nextInt(0, emptyCells.length - 1)];
-      }
-      
-      // Determine path length (more flexible for last paths)
+      // Choose starting position: prefer corners/edges (fewer neighbors)
+      // to avoid creating unreachable pockets
+      const cellsByDegree = emptyCells.map(cell => ({
+        cell,
+        degree: warnsdorffDegree(cell.x, cell.y),
+      }));
+      cellsByDegree.sort((a, b) => a.degree - b.degree);
+
+      // Pick from the bottom 30% (fewest neighbors) with some randomness
+      const pickCount = Math.max(1, Math.floor(cellsByDegree.length * 0.3));
+      const start = cellsByDegree[rng.nextInt(0, pickCount - 1)].cell;
+
+      // Determine path length
       const avgLength = Math.ceil(remainingCells / (pairCount - pairId + 1));
-      let minLength = Math.max(2, Math.floor(avgLength * 0.6));
-      let maxLength = Math.min(remainingCells, Math.ceil(avgLength * 1.5));
+      let minLength = Math.max(3, Math.floor(avgLength * 0.5));
+      let maxLength = Math.min(remainingCells, Math.ceil(avgLength * 1.6));
       
       // For last path, use all remaining cells
       if (pairId === pairCount) {
@@ -223,38 +269,38 @@ export class ConnectDotsEngine {
       
       const targetLength = rng.nextInt(minLength, maxLength);
 
-      // Build path via DFS with backtracking
+      // Build path via DFS with backtracking and Warnsdorff's heuristic
       const path: Array<{ x: number; y: number }> = [];
-      const visited = new Set<string>();
 
       const dfs = (x: number, y: number, depth: number): boolean => {
         iteration++;
         if (iteration > maxIterations) return false;
 
         path.push({ x, y });
-        visited.add(`${x},${y}`);
         grid[y][x] = pairId;
 
         // Stop when target length reached
-        if (depth >= targetLength) return true;
+        if (depth >= targetLength) {
+          // For non-last paths, verify remaining empty cells are still connected
+          if (pairId < pairCount && !isConnected()) {
+            path.pop();
+            grid[y][x] = -1;
+            return false;
+          }
+          return true;
+        }
 
         const neighbors = getUnvisitedNeighbors(x, y);
-        
-        // Sort neighbors to prefer continuing in same direction (creates nicer paths)
-        if (path.length >= 2) {
-          const prevX = path[path.length - 2].x;
-          const prevY = path[path.length - 2].y;
-          const dirX = x - prevX;
-          const dirY = y - prevY;
-          
-          neighbors.sort((a, b) => {
-            const aDir = (a.x - x === dirX && a.y - y === dirY) ? 1 : 0;
-            const bDir = (b.x - x === dirX && b.y - y === dirY) ? 1 : 0;
-            return bDir - aDir;
-          });
-        }
-        
-        rng.shuffle(neighbors);
+
+        // Warnsdorff's heuristic: sort by ascending degree (prefer cells with
+        // fewer remaining exits). This dramatically reduces dead-ends.
+        // Add small random tiebreaker for variety.
+        neighbors.sort((a, b) => {
+          const degA = warnsdorffDegree(a.x, a.y);
+          const degB = warnsdorffDegree(b.x, b.y);
+          if (degA !== degB) return degA - degB;
+          return rng.nextInt(0, 1) === 0 ? -1 : 1; // random tiebreaker
+        });
 
         for (const { x: nx, y: ny } of neighbors) {
           if (dfs(nx, ny, depth + 1)) return true;
@@ -262,7 +308,6 @@ export class ConnectDotsEngine {
 
         // Backtrack
         path.pop();
-        visited.delete(`${x},${y}`);
         grid[y][x] = -1;
         return false;
       };
@@ -287,7 +332,8 @@ export class ConnectDotsEngine {
     let currentCells = totalCells;
     for (let pairId = 1; pairId <= pairCount; pairId++) {
       let success = false;
-      const retries = pairId === pairCount ? 50 : 30; // More retries for last path
+      // More retries for later paths (they're more constrained)
+      const retries = pairId === pairCount ? 80 : 50;
       for (let retry = 0; retry < retries; retry++) {
         if (buildPath(pairId, currentCells)) {
           const pathLength = paths.get(pairId)!.length;

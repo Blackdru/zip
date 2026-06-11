@@ -128,7 +128,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildDifficultyBadge('Easy', AppTheme.accentGreen, '5×5 grid • 5-6 checkpoints'),
+                        _buildDifficultyBadge('Easy', AppTheme.accentGreen, '6*6 grid • 3 pairs'),
                         const SizedBox(width: 12),
                       ],
                     ),
@@ -136,7 +136,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildDifficultyBadge('Medium', AppTheme.accentYellow, '6×6 grid • 7-9 checkpoints'),
+                        _buildDifficultyBadge('Medium', AppTheme.accentYellow, '7*7 grid • 4-5 pairs'),
                         const SizedBox(width: 12),
                       ],
                     ),
@@ -144,7 +144,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildDifficultyBadge('Hard', AppTheme.primaryPink, '7×7 grid • 10-12 checkpoints'),
+                        _buildDifficultyBadge('Hard', AppTheme.primaryPink, '8*8 grid • 6-7 pairs'),
                       ],
                     ),
                     
