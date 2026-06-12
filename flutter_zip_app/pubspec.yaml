@@ -69,6 +69,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/sounds/
+    - assets/dots/
   
   # fonts:
   #   - family: CustomIcons

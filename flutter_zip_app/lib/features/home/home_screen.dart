@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/router/app_router.dart';
 
@@ -107,7 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               boxShadow: [
                                 BoxShadow(
                                   color: AppTheme.vibrantPurple.withValues(alpha: 0.3 * _pulseAnimation.value),
-                                  blurRadius: 30 * _pulseAnimation.value,
+                                  blurRadius: 3 * _pulseAnimation.value,
                                   spreadRadius: 5,
                                 ),
                                 BoxShadow(
@@ -139,15 +140,107 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   
                   const SizedBox(height: 50),
                   
-                  // Stats cards
-                  _buildStatsCards(),
                   
-                  const SizedBox(height: 40),
+                   const SizedBox(height: 110),
                 ],
               ),
             ),
           ),
+          
+          // Floating promo button for Dots app (Centered at bottom)
+          Positioned(
+            bottom: 24,
+            left: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: _buildTryDotsButton(context),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTryDotsButton(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.electricBlue.withValues(alpha: 0.85),
+            AppTheme.vibrantPurple.withValues(alpha: 0.85),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.electricBlue.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            final url = Uri.parse('https://play.google.com/store/apps/details?id=com.budrock.dots');
+            try {
+              if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not open store link')),
+                  );
+                }
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            }
+          },
+          borderRadius: BorderRadius.circular(30),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/dots/app_icon.png',
+                    width: 42,
+                    height: 42,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.star_rounded,
+                      color: AppTheme.gold,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Text(
+                  'Try Connect Color Game',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -26,6 +26,7 @@ class DotsGestureController extends PositionComponent
   int? _currentPairId;
   bool _isDrawing = false;
   Vector2? _currentDragPosition;
+  int? _activePointerId;
 
   // FIX #10: Flag to block all gestures after puzzle completion.
   bool _puzzleCompleted = false;
@@ -49,8 +50,15 @@ class DotsGestureController extends PositionComponent
   void onDragStart(DragStartEvent event) {
     super.onDragStart(event);
 
+    // FIX: Only accept events from the active pointer. Ignore second finger
+    // while one finger is already drawing — prevents multi-touch corruption.
+    if (_activePointerId != null && _activePointerId != event.pointerId) return;
+
     // FIX #10: Block all gestures after puzzle is completed.
     if (_puzzleCompleted) return;
+
+    // Claim this pointer as the active one
+    _activePointerId = event.pointerId;
 
     final cell = _screenToGrid(event.localPosition);
     if (cell == null) return;
@@ -70,11 +78,17 @@ class DotsGestureController extends PositionComponent
       final previousPath = _allPaths[_currentPairId];
       if (previousPath != null && _isPathComplete(previousPath, _currentPairId!)) {
         _completedPairIds.add(_currentPairId!);
+      } else if (previousPath != null) {
+        // Previous path incomplete — remove it so it doesn't linger
+        _clearPath(_currentPairId!);
       }
       
       _isDrawing = false;
       _currentPairId = null;
       _currentDragPosition = null;
+      // NOTE: Do NOT reset _activePointerId here — the same finger is still
+      // down. Resetting it would cause onDragUpdate to reject all subsequent
+      // events from this pointer, making the new pair's drawing unresponsive.
       
       // Update UI to reflect the finished previous path
       onPathUpdate(_allPaths, null, null);
@@ -167,6 +181,9 @@ class DotsGestureController extends PositionComponent
   @override
   void onDragUpdate(DragUpdateEvent event) {
     super.onDragUpdate(event);
+
+    // FIX: Only process events from the active pointer
+    if (_activePointerId != event.pointerId) return;
 
     // FIX #10: Block gestures after puzzle completion.
     if (_puzzleCompleted) return;
@@ -368,6 +385,9 @@ class DotsGestureController extends PositionComponent
   @override
   void onDragEnd(DragEndEvent event) {
     super.onDragEnd(event);
+    // FIX: Only process events from the active pointer
+    if (_activePointerId != event.pointerId) return;
+    _activePointerId = null;
     _currentDragPosition = null;
     _finishPath();
   }
@@ -375,9 +395,22 @@ class DotsGestureController extends PositionComponent
   @override
   void onDragCancel(DragCancelEvent event) {
     super.onDragCancel(event);
+    // FIX: Only process events from the active pointer
+    if (_activePointerId != event.pointerId) return;
+    _activePointerId = null;
+    final cancelledPairId = _currentPairId;
     _currentDragPosition = null;
     _isDrawing = false;
     _currentPairId = null;
+
+    // Clean up incomplete paths — if the cancelled drawing didn't connect
+    // both dots, remove it so it doesn't linger as a tiny orphaned segment.
+    if (cancelledPairId != null) {
+      final path = _allPaths[cancelledPairId];
+      if (path != null && !_isPathComplete(path, cancelledPairId)) {
+        _clearPath(cancelledPairId);
+      }
+    }
     onPathUpdate(_allPaths, null, null);
   }
 
@@ -388,6 +421,10 @@ class DotsGestureController extends PositionComponent
     final currentPath = _allPaths[_currentPairId];
     if (currentPath != null && _isPathComplete(currentPath, _currentPairId!)) {
       _completedPairIds.add(_currentPairId!);
+    } else if (currentPath != null) {
+      // Path is incomplete — remove it so it doesn't linger as an orphaned
+      // segment that looks like it disappeared.
+      _clearPath(_currentPairId!);
     }
 
     _isDrawing = false;
@@ -549,7 +586,14 @@ class DotsGestureController extends PositionComponent
     _currentPairId = null;
     _isDrawing = false;
     _currentDragPosition = null;
+    _activePointerId = null;
     _puzzleCompleted = false; // FIX #10: Reset completion flag on puzzle reset.
+    onPathUpdate(_allPaths, null, null);
+  }
+
+  /// Public method to clear a specific path (used by hint system)
+  void clearPath(int pairId) {
+    _clearPath(pairId);
     onPathUpdate(_allPaths, null, null);
   }
 

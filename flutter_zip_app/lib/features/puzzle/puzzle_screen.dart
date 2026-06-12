@@ -167,7 +167,7 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
           );
     }
 
-    // Show interstitial ad after every 3-4 games
+    // Show interstitial ad after every 5-6 games
     AdService().onPuzzleCompleted();
 
     if (mounted) {
@@ -200,39 +200,29 @@ class _PuzzleScreenState extends ConsumerState<PuzzleScreen> {
       }
     }
 
-    final bool hasDiverged = matchingLength < currentPath.length;
-
-    if (hasDiverged) {
-      // Player took a wrong turn — tell them how many steps to undo.
-      final stepsToUndo = currentPath.length - matchingLength;
-      _game!.showHintDiverged(stepsToUndo);
-
-      _showHintSnackBar(
-        'Wrong path! Go back $stepsToUndo ${stepsToUndo == 1 ? "step" : "steps"} and follow the hint arrows',
-      );
-    } else {
-      // Player is on the correct path — show next cells with arrows.
-      final startIdx = matchingLength;
-      if (startIdx >= solutionPath.length) {
-        _showHintSnackBar('You\'re on the right track!');
-        return;
-      }
-
-      // Collect up to 3 next cells to show.
-      final hintCells = <GridCell>[];
-      final count = (solutionPath.length - startIdx).clamp(0, 3);
-      for (int i = 0; i < count; i++) {
-        final step = solutionPath[startIdx + i];
-        hintCells.add(GridCell(x: step.x, y: step.y));
-      }
-
-      // Also pass the "from" cell (where user currently is).
-      final fromCell = currentPath.isNotEmpty
-          ? currentPath.last
-          : GridCell(x: solutionPath[0].x, y: solutionPath[0].y);
-
-      _game!.showDirectionalHint(fromCell, hintCells);
+    final int startIdx = matchingLength == 0 ? 1 : matchingLength;
+    if (startIdx >= solutionPath.length) {
+      _showHintSnackBar("You're on the right track!");
+      return;
     }
+
+    // Show directional hint starting from the last correct cell
+    final fromCellIdx = (matchingLength - 1).clamp(0, solutionPath.length - 1);
+    final fromCell = GridCell(
+      x: solutionPath[fromCellIdx].x,
+      y: solutionPath[fromCellIdx].y,
+    );
+
+    // Collect up to 3 next correct cells to show
+    final hintCells = <GridCell>[];
+    final count = (solutionPath.length - startIdx).clamp(0, 3);
+    for (int i = 0; i < count; i++) {
+      final step = solutionPath[startIdx + i];
+      hintCells.add(GridCell(x: step.x, y: step.y));
+    }
+
+    _game!.showDirectionalHint(fromCell, hintCells);
+    _showHintSnackBar('Follow the green hint arrows');
 
     // Style the Hint button for 4 seconds.
     setState(() => _hintActive = true);

@@ -25,7 +25,7 @@ class SettingsScreen extends StatelessWidget {
               _buildTile(
                 icon: Icons.info_outline,
                 title: 'Version',
-                subtitle: '1.0.0',
+                subtitle: '1.0.2',
                 onTap: () {},
               ),
               _buildTile(
@@ -66,7 +66,7 @@ class SettingsScreen extends StatelessWidget {
                 icon: Icons.star_outline,
                 title: 'Rate Us',
                 subtitle: 'Share your feedback',
-                onTap: () {},
+                onTap: () => _launchPlayStore(),
               ),
             ],
           ),
@@ -77,6 +77,13 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _launchPrivacyPolicy() async {
     final uri = Uri.parse('https://robotpdf.com/apps/connectdots');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _launchPlayStore() async {
+    final uri = Uri.parse('https://play.google.com/store/apps/details?id=com.budrock.dots');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

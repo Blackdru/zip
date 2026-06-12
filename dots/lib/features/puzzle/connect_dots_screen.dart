@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flame/game.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../../core/theme/app_theme.dart';
 import '../../flame/connect_dots_game.dart';
 import '../../models/connect_dots_puzzle.dart';
 import '../../models/color_dot.dart';
 import '../../providers/connect_dots_provider.dart';
 import '../../providers/puzzle_stats_provider.dart';
+import '../../services/ad_service.dart';
 
 class ConnectDotsScreen extends ConsumerStatefulWidget {
   final String? puzzleId;
@@ -36,16 +38,33 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   int _lastCompletedPairs = 0;
   GamePhase _lastPhase = GamePhase.idle;
 
+  // Banner ad
+  BannerAd? _bannerAd;
+  bool _isBannerAdLoaded = false;
+
   @override
   void initState() {
     super.initState();
     _loadPuzzle();
+    _loadBannerAd();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _bannerAd?.dispose();
     super.dispose();
+  }
+
+  void _loadBannerAd() {
+    _bannerAd = AdService().createBannerAd();
+    if (_bannerAd != null) {
+      _bannerAd!.load().then((_) {
+        setState(() {
+          _isBannerAdLoaded = true;
+        });
+      });
+    }
   }
 
   Future<void> _loadPuzzle() async {
@@ -57,7 +76,6 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
         final puzzleState = ref.read(connectDotsProvider);
         if (puzzleState.puzzle != null && mounted) {
           _initializeGame(puzzleState.puzzle!);
-          _startTimer();
         }
       } else if (widget.puzzleId != null) {
         // Await the full async load so the state is settled before we read it.
@@ -66,7 +84,6 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
         final puzzleState = ref.read(connectDotsProvider);
         if (puzzleState.puzzle != null) {
           _initializeGame(puzzleState.puzzle!);
-          _startTimer();
         }
       }
     });
@@ -79,9 +96,12 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
         onPuzzleComplete: _handlePuzzleComplete,
         onStateChanged: _handleStateChanged,
         onPathConflict: _handlePathConflict,
+        onGameReady: () {
+          // Start widget timer when game engine timer starts
+          _startTimer();
+        },
       );
     });
-    Future.microtask(() => _game?.startPuzzle());
   }
 
   void _handleStateChanged(GameState state) {
@@ -113,13 +133,15 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
     );
   }
 
-  void _startTimer() {
+  void _startTimer({bool resetSeconds = true}) {
     // FIX #1: Cancel any existing timer before starting a new one to prevent
     // double-timer bugs (e.g. reset → new puzzle path).
     _timer?.cancel();
-    setState(() {
-      _elapsedSeconds = 0;
-    });
+    if (resetSeconds) {
+      setState(() {
+        _elapsedSeconds = 0;
+      });
+    }
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _elapsedSeconds++);
@@ -148,6 +170,8 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
     // Increment completed puzzles count for practice mode
     if (widget.isPractice) {
       await ref.read(puzzleStatsProvider.notifier).markPuzzleCompleted();
+      // Notify ad service about puzzle completion (for interstitial ads)
+      AdService().onPuzzleCompleted();
     }
 
     if (!widget.isPractice && widget.puzzleId != null) {
@@ -164,96 +188,27 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
   }
 
   void _showCompletionDialog(int solveTimeMs) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: AppTheme.primaryGradient,
-              ),
-              child: const Icon(
-                Icons.check,
-                size: 48,
-                color: Colors.white,
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            const Text(
-              'Puzzle Complete!',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            Text(
-              _formatTime(solveTimeMs ~/ 1000),
-              style: TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.w800,
-                foreground: Paint()
-                  ..shader = AppTheme.primaryGradient.createShader(
-                    const Rect.fromLTWH(0, 0, 200, 70),
-                  ),
-              ),
-            ),
-            
-            const SizedBox(height: 8),
-            
-            Text(
-              'Time to complete',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              // FIX #12: Use context.go() instead of double context.pop().
-              // The double-pop assumed a specific stack depth which could
-              // break with deep links or stack manipulation.
-              context.go('/practice');
-            },
-            child: const Text('BACK'),
-          ),
-          
-          if (widget.isPractice)
-            ElevatedButton(
-              onPressed: () {
-                context.pop(); // Close dialog
-                // FIX #3: Don't call _resetPuzzle() here — it would start a
-                // timer that _startNewPuzzle() immediately starts a second one.
-                // Instead, reset state flags and let _startNewPuzzle manage
-                // the game + timer lifecycle entirely.
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _CompletionSheet(
+        solveTimeMs: solveTimeMs,
+        isPractice: widget.isPractice,
+        formattedTime: _formatTime(solveTimeMs ~/ 1000),
+        onBack: () => context.go('/practice'),
+        onNextPuzzle: widget.isPractice
+            ? () {
+                Navigator.of(ctx).pop();
                 setState(() {
                   _isShowingCompletionDialog = false;
                   _elapsedSeconds = 0;
                 });
                 _startNewPuzzle();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryPurple,
-              ),
-              child: const Text('NEXT PUZZLE'),
-            ),
-        ],
+              }
+            : null,
       ),
     );
   }
@@ -266,12 +221,12 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
 
   void _resetPuzzle() {
     setState(() {
-      _elapsedSeconds = 0;
+      // Do NOT reset _elapsedSeconds — timer keeps running on puzzle reset.
       _isShowingCompletionDialog = false;
     });
     _game?.reset();
-    // _startTimer() cancels any previous timer internally before starting fresh.
-    _startTimer();
+    // Resume timer without resetting the elapsed time.
+    _startTimer(resetSeconds: false);
   }
 
   void _showHint() {
@@ -298,6 +253,9 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
     int pairLabel = 1;
 
     final pairIds = colorDots.map((d) => d.pairId).toSet().toList()..sort();
+
+    // 1. First, look for an unconnected pair (no path drawn at all, or path
+    //    doesn't reach both dots).
     for (int i = 0; i < pairIds.length; i++) {
       final pid = pairIds[i];
       final path = activePaths[pid];
@@ -320,12 +278,172 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
       }
     }
 
+    // 2. Dead-end fallback: all pairs are connected but the puzzle isn't solved
+    //    (paths are wrong). Find which path needs to change to fill empty cells.
+    bool isDeadEndHint = false;
+    if (targetPairId == null && _game!.gameState.phase != GamePhase.completed) {
+      // Calculate which cells are currently empty
+      final gridSize = puzzle.gridSize;
+      final totalCells = gridSize * gridSize;
+      final filledCells = <String>{};
+      for (final path in activePaths.values) {
+        for (final cell in path) {
+          filledCells.add('${cell.x},${cell.y}');
+        }
+      }
+      final emptyCellCount = totalCells - filledCells.length;
+      
+      if (emptyCellCount > 0) {
+        // Find the path that, when replaced with the solution, would fill the most empty cells
+        int maxEmptyCellsCovered = 0;
+        int? bestPairId;
+        
+        for (int i = 0; i < pairIds.length; i++) {
+          final pid = pairIds[i];
+          final playerPath = activePaths[pid];
+          if (playerPath == null) continue;
+          
+          final solution = solutionPaths.where((s) => s.pairId == pid).firstOrNull;
+          if (solution == null) continue;
+          
+          // Calculate how many currently-empty cells this solution path would cover
+          final solutionCells = <String>{};
+          for (final cell in solution.path) {
+            final key = '${cell.x},${cell.y}';
+            if (!filledCells.contains(key)) {
+              solutionCells.add(key);
+            }
+          }
+          
+          // Also check if the current player path differs from solution
+          bool pathMatches = false;
+          if (playerPath.length == solution.path.length) {
+            bool forwardMatch = true;
+            for (int j = 0; j < playerPath.length; j++) {
+              if (playerPath[j].x != solution.path[j].x ||
+                  playerPath[j].y != solution.path[j].y) {
+                forwardMatch = false;
+                break;
+              }
+            }
+            if (!forwardMatch) {
+              bool reverseMatch = true;
+              for (int j = 0; j < playerPath.length; j++) {
+                final sj = solution.path[solution.path.length - 1 - j];
+                if (playerPath[j].x != sj.x || playerPath[j].y != sj.y) {
+                  reverseMatch = false;
+                  break;
+                }
+              }
+              pathMatches = reverseMatch;
+            } else {
+              pathMatches = true;
+            }
+          }
+          
+          // Prioritize paths that: 1) don't match solution, AND 2) would cover empty cells
+          if (!pathMatches && solutionCells.length > maxEmptyCellsCovered) {
+            maxEmptyCellsCovered = solutionCells.length;
+            bestPairId = pid;
+          }
+        }
+        
+        if (bestPairId != null) {
+          targetPairId = bestPairId;
+          pairLabel = pairIds.indexOf(bestPairId) + 1;
+          isDeadEndHint = true;
+        } else {
+          // Fallback: just find the first mismatched path
+          for (int i = 0; i < pairIds.length; i++) {
+            final pid = pairIds[i];
+            final playerPath = activePaths[pid];
+            if (playerPath == null) continue;
+
+            final solution = solutionPaths.where((s) => s.pairId == pid).firstOrNull;
+            if (solution == null) continue;
+
+            bool pathMatches = false;
+            if (playerPath.length == solution.path.length) {
+              bool forwardMatch = true;
+              for (int j = 0; j < playerPath.length; j++) {
+                if (playerPath[j].x != solution.path[j].x ||
+                    playerPath[j].y != solution.path[j].y) {
+                  forwardMatch = false;
+                  break;
+                }
+              }
+              if (!forwardMatch) {
+                bool reverseMatch = true;
+                for (int j = 0; j < playerPath.length; j++) {
+                  final sj = solution.path[solution.path.length - 1 - j];
+                  if (playerPath[j].x != sj.x || playerPath[j].y != sj.y) {
+                    reverseMatch = false;
+                    break;
+                  }
+                }
+                pathMatches = reverseMatch;
+              } else {
+                pathMatches = true;
+              }
+            }
+
+            if (!pathMatches) {
+              targetPairId = pid;
+              pairLabel = i + 1;
+              isDeadEndHint = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
     if (targetPairId != null) {
       final solution = solutionPaths.firstWhere(
         (s) => s.pairId == targetPairId,
         orElse: () => solutionPaths.first,
       );
-      _game!.showPathHint(solution, pairLabel);
+
+      // For dead-end hints, show a message explaining which path needs to change
+      if (isDeadEndHint) {
+        final dot = colorDots.where((d) => d.pairId == targetPairId).firstOrNull;
+        final colorName = dot?.color ?? 'this';
+        
+        // Count empty cells to give better feedback
+        final gridSize = puzzle.gridSize;
+        final totalCells = gridSize * gridSize;
+        final filledCells = <String>{};
+        for (final path in activePaths.values) {
+          for (final cell in path) {
+            filledCells.add('${cell.x},${cell.y}');
+          }
+        }
+        final emptyCellCount = totalCells - filledCells.length;
+        
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              emptyCellCount > 1
+                  ? 'Change the $colorName path - $emptyCellCount cells need to be filled'
+                  : 'Adjust the $colorName path to fill the last cell',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            backgroundColor: const Color(0xFFD97706),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        
+        // For dead-end hints, clear the player's path first so they can
+        // see the complete correct solution without confusion
+        _game!.clearPath(targetPairId);
+      }
+
+      // Show the hint
+      _game!.showPathHint(solution, pairLabel, forceComplete: isDeadEndHint);
     }
   }
 
@@ -362,10 +480,8 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
 
       final newPuzzle = newState.puzzle;
       if (newPuzzle != null) {
-        // _initializeGame + _startTimer are the single path that starts the
-        // timer; no duplicate start happens here.
+        // _initializeGame will start both game and widget timers via callback
         _initializeGame(newPuzzle);
-        _startTimer();
       }
     }
   }
@@ -376,69 +492,309 @@ class _ConnectDotsScreenState extends ConsumerState<ConnectDotsScreen> {
     final gameState = _game?.gameState;
 
     return Scaffold(
+      backgroundColor: AppTheme.darkBackground,
+      // ── Top bar ────────────────────────────────────────────────────────────
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+        backgroundColor: AppTheme.cardBackground,
+        elevation: 0,
+        leading: GestureDetector(
+          onTap: () => context.pop(),
+          child: Container(
+            margin: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.white),
+          ),
         ),
         title: Row(
           children: [
-            // Timer
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.timer, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatTime(_elapsedSeconds),
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
+            // ── Timer pill ──────────────────────────────────────────────────
+            _StatPill(
+              icon: Icons.timer_outlined,
+              label: _formatTime(_elapsedSeconds),
+              iconColor: AppTheme.primaryCyan,
             ),
-            
-            const SizedBox(width: 12),
-            
-            // Progress
+            const SizedBox(width: 10),
+            // ── Pairs progress pill ─────────────────────────────────────────
             if (gameState != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${gameState.completedPairs}/${gameState.totalPairs}',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
+              _StatPill(
+                icon: Icons.radio_button_checked,
+                label: '${gameState.completedPairs} / ${gameState.totalPairs}',
+                iconColor: AppTheme.accentGreen,
               ),
           ],
         ),
         actions: [
-          // Hint button
+          // ── Hint button ────────────────────────────────────────────────────
           IconButton(
-            icon: const Icon(Icons.lightbulb_outline),
+            icon: const Icon(Icons.lightbulb_outline, color: Colors.white70),
             tooltip: 'Hint',
             onPressed: _showHint,
           ),
-          // Reset button
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Reset',
-            onPressed: _resetPuzzle,
+          // ── Reset button ────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white70),
+              tooltip: 'Reset',
+              onPressed: _resetPuzzle,
+            ),
           ),
         ],
       ),
+      // ── Game body ──────────────────────────────────────────────────────────
       body: puzzleState.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.primaryPurple))
           : _game == null
-              ? const Center(child: Text('No puzzle loaded'))
-              : GameWidget(game: _game!),
+              ? const Center(
+                  child: Text('No puzzle loaded',
+                      style: TextStyle(color: Colors.white54)))
+              : Column(
+                  children: [
+                    // Game area
+                    Expanded(
+                      child: GameWidget(game: _game!),
+                    ),
+                    // Banner ad at the bottom
+                    if (_isBannerAdLoaded && _bannerAd != null)
+                      Container(
+                        alignment: Alignment.center,
+                        width: _bannerAd!.size.width.toDouble(),
+                        height: _bannerAd!.size.height.toDouble(),
+                        child: AdWidget(ad: _bannerAd!),
+                      ),
+                  ],
+                ),
+    );
+  }
+}
+
+// ── Stat pill widget used in the AppBar ───────────────────────────────────────
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color iconColor;
+
+  const _StatPill({
+    required this.icon,
+    required this.label,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.10),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: iconColor),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Puzzle completion bottom sheet ────────────────────────────────────────────
+class _CompletionSheet extends StatelessWidget {
+  final int solveTimeMs;
+  final bool isPractice;
+  final String formattedTime;
+  final VoidCallback onBack;
+  final VoidCallback? onNextPuzzle;
+
+  const _CompletionSheet({
+    required this.solveTimeMs,
+    required this.isPractice,
+    required this.formattedTime,
+    required this.onBack,
+    this.onNextPuzzle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      padding: const EdgeInsets.fromLTRB(28, 12, 28, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Trophy icon
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppTheme.accentGreen.withValues(alpha: 0.12),
+              border: Border.all(
+                color: AppTheme.accentGreen.withValues(alpha: 0.40),
+                width: 2,
+              ),
+            ),
+            child: const Icon(
+              Icons.emoji_events_rounded,
+              size: 42,
+              color: AppTheme.accentGreen,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          const Text(
+            'Puzzle Complete!',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            'Great job solving the puzzle',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.50),
+            ),
+          ),
+
+          const SizedBox(height: 28),
+
+          // Time stat box
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  size: 22,
+                  color: AppTheme.primaryCyan,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  formattedTime,
+                  style: const TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'solve time',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.45),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 28),
+
+          // ── Action buttons ─────────────────────────────────────────────────
+          if (isPractice && onNextPuzzle != null)
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: onNextPuzzle,
+                icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                label: const Text(
+                  'NEXT PUZZLE',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryPurple,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+
+          if (isPractice && onNextPuzzle != null) const SizedBox(height: 12),
+
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: onBack,
+              icon: const Icon(Icons.home_outlined, size: 20),
+              label: const Text(
+                'BACK TO HOME',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white70,
+                side: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  width: 1.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

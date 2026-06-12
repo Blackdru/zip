@@ -14,6 +14,7 @@ class ConnectDotsGame extends FlameGame {
   final Function(List<PlayerPath> paths, int solveTimeMs) onPuzzleComplete;
   final Function(GameState state) onStateChanged;
   final VoidCallback? onPathConflict;
+  final VoidCallback? onGameReady;
 
   late DotsBoard _board;
   late MultiPathRenderer _pathRenderer;
@@ -34,6 +35,7 @@ class ConnectDotsGame extends FlameGame {
     required this.onPuzzleComplete,
     required this.onStateChanged,
     this.onPathConflict,
+    this.onGameReady,
   });
 
   @override
@@ -101,26 +103,25 @@ class ConnectDotsGame extends FlameGame {
     );
     await add(_gestureController);
 
-    // FIX #4: Mark as loaded and start the timer now that all components
-    // are initialized. If startPuzzle() was called before onLoad completed,
-    // the deferred start will happen here.
+    // FIX #4: Mark as loaded and start the timer NOW that all components
+    // are initialized. Always set start time here to ensure widget timer
+    // and game timer are synchronized.
     _isLoaded = true;
-    if (_gameState.phase == GamePhase.playing) {
-      // startPuzzle() was called early — set the real start time now.
-      _startTimeMs = DateTime.now().millisecondsSinceEpoch;
-    }
-  }
-
-  /// FIX #4: Start the puzzle. If onLoad hasn't finished yet, mark the phase
-  /// as playing so onLoad's tail will set the start time once ready.
-  void startPuzzle() {
+    _startTimeMs = DateTime.now().millisecondsSinceEpoch;
     _gameState = _gameState.copyWith(phase: GamePhase.playing);
     onStateChanged(_gameState);
+    // Notify the widget that game is ready and timer should start
+    onGameReady?.call();
+  }
 
+  /// Start the puzzle timer - this is now called automatically in onLoad()
+  /// but kept for manual reset functionality.
+  void startPuzzle() {
     if (_isLoaded) {
       _startTimeMs = DateTime.now().millisecondsSinceEpoch;
     }
-    // else: onLoad will set _startTimeMs when it finishes.
+    _gameState = _gameState.copyWith(phase: GamePhase.playing);
+    onStateChanged(_gameState);
   }
 
   void _handlePathUpdate(
@@ -198,17 +199,71 @@ class ConnectDotsGame extends FlameGame {
     onStateChanged(_gameState);
   }
 
-  void showPathHint(SolutionPath solutionPath, int pairLabel) {
+  void showPathHint(SolutionPath solutionPath, int pairLabel, {bool forceComplete = false}) {
     if (solutionPath.path.isEmpty) return;
-    final startCell = solutionPath.path.first;
-    final remainingCells = solutionPath.path.sublist(1);
+
+    final solPath = solutionPath.path;
+    int startIndex = 0;
+
+    // For dead-end hints, show the complete path from the beginning
+    // so the player can see the entire correct route
+    if (!forceComplete) {
+      // If the player already has a path for this pair, skip the matching
+      // prefix so the hint starts at the divergence point (where they went
+      // wrong) instead of redundantly showing cells they already have correct.
+      final playerPath = _gameState.activePaths[solutionPath.pairId];
+      if (playerPath != null && playerPath.length >= 2) {
+        // Try forward match (player drew in same direction as solution)
+        int forwardMatch = 0;
+        for (int i = 0; i < playerPath.length && i < solPath.length; i++) {
+          if (playerPath[i].x == solPath[i].x &&
+              playerPath[i].y == solPath[i].y) {
+            forwardMatch++;
+          } else {
+            break;
+          }
+        }
+
+        // Try reverse match (player drew from the other dot)
+        int reverseMatch = 0;
+        for (int i = 0; i < playerPath.length && i < solPath.length; i++) {
+          final si = solPath.length - 1 - i;
+          if (playerPath[i].x == solPath[si].x &&
+              playerPath[i].y == solPath[si].y) {
+            reverseMatch++;
+          } else {
+            break;
+          }
+        }
+
+        if (forwardMatch >= reverseMatch && forwardMatch > 1) {
+          // Show from last matching cell so user sees where to change direction
+          startIndex = (forwardMatch - 1).clamp(0, solPath.length - 2);
+        } else if (reverseMatch > forwardMatch && reverseMatch > 1) {
+          // Player drew in reverse — divergence is near the start of solution.
+          // Show from the divergence point in solution's forward direction.
+          final divergeInSol = (solPath.length - reverseMatch).clamp(0, solPath.length - 2);
+          // Back up one cell so the user sees the "turn" context
+          startIndex = (divergeInSol > 0 ? divergeInSol - 1 : 0);
+        }
+      }
+    }
+
+    final startCell = solPath[startIndex];
+    // Show the complete remaining path from the divergence point.
+    final hintCells = solPath.sublist(startIndex + 1);
     _hintRenderer.showHint(
       solutionPath.pairId,
       startCell,
-      remainingCells,
+      hintCells,
       pairLabel,
     );
   }
+
+  void clearPath(int pairId) {
+    _gestureController.clearPath(pairId);
+  }
+
 
   GameState get gameState => _gameState;
 }

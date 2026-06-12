@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Connect Dots app splash screen (API 21+) -->
+<!-- Modify this file to customize your launch splash screen -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Dark background matching app theme -->
     <item android:drawable="@color/splash_background" />
 
-    <!-- App icon centered -->
-    <item>
+    <!-- You can insert your own image assets here -->
+    <!-- <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/ic_launcher" />
-    </item>
+            android:src="@mipmap/launch_image" />
+    </item> -->
 </layer-list>

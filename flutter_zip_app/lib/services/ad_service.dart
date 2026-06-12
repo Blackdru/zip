@@ -11,7 +11,7 @@ class AdService {
   static const String _bannerAdUnitId = 'ca-app-pub-3990640624622013/5713426486';
   static const String _interstitialAdUnitId = 'ca-app-pub-3990640624622013/7493412014';
 
-  // Counter for interstitial ads (show after every 3-4 games)
+  // Counter for interstitial ads (show after every 5-6 games)
   int _gamesCompleted = 0;
   InterstitialAd? _interstitialAd;
   bool _isInterstitialAdReady = false;
@@ -82,12 +82,12 @@ class AdService {
     );
   }
 
-  /// Show interstitial ad after every 3-4 games completed
+  /// Show interstitial ad after every 5-6 games completed
   void onPuzzleCompleted() {
     _gamesCompleted++;
     
-    // Show ad after 3 or 4 games (randomized between 3-4)
-    final showAfter = 3 + (_gamesCompleted % 2); // Alternates between 3 and 4
+    // Show ad after 5 or 6 games (randomized between 5-6)
+    final showAfter = 5 + (_gamesCompleted % 2); // Alternates between 5 and 6
     
     if (_gamesCompleted >= showAfter) {
       showInterstitialAd();

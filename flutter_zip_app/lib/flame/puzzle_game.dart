@@ -99,7 +99,7 @@ class PuzzleGame extends FlameGame {
   /// Show a directional hint: from the user's current cell, draw arrows
   /// through [hintCells] showing the next steps of the correct path.
   void showDirectionalHint(GridCell fromCell, List<GridCell> hintCells,
-      {int durationMs = 4000}) {
+      {int durationMs = 4000,}) {
     clearHint();
     _hintOverlay = _DirectionalHintOverlay(
       fromCell: fromCell,
@@ -111,25 +111,6 @@ class PuzzleGame extends FlameGame {
     Future.delayed(Duration(milliseconds: durationMs), clearHint);
   }
 
-  /// Show a divergence hint: highlight the wrong cells the user must undo.
-  void showHintDiverged(int stepsToUndo, {int durationMs = 4000}) {
-    clearHint();
-    // We highlight the last N cells of the current path as "wrong".
-    final currentPath = _gameState.currentPath;
-    if (currentPath.isEmpty || stepsToUndo <= 0) return;
-
-    final wrongCells = currentPath
-        .sublist((currentPath.length - stepsToUndo).clamp(0, currentPath.length))
-        .toList();
-
-    _hintOverlay = _DivergedHintOverlay(
-      wrongCells: wrongCells,
-      cellSize: _board.cellSize,
-      boardPosition: _board.position,
-    );
-    add(_hintOverlay!);
-    Future.delayed(Duration(milliseconds: durationMs), clearHint);
-  }
 
   /// Keep old showHint for backwards compatibility.
   void showHint(GridCell cell, {int durationMs = 3000}) {
@@ -305,7 +286,7 @@ class _DirectionalHintOverlay extends PositionComponent {
   }
 
   void _drawArrow(Canvas canvas, GridCell from, GridCell to, Color color,
-      double opacity) {
+      double opacity,) {
     final fromCenter = _cellCenter(from);
     final toCenter = _cellCenter(to);
 
@@ -333,7 +314,7 @@ class _DirectionalHintOverlay extends PositionComponent {
     // Animated dashes.
     final dashPhase = (_elapsed * 40.0) % 18.0;
     _drawDashedLine(canvas, lineStart, lineEnd,
-        color.withValues(alpha: 0.7 * opacity), dashPhase);
+        color.withValues(alpha: 0.7 * opacity), dashPhase,);
 
     // Arrowhead.
     final arrowSize = cellSize * 0.13;
@@ -342,23 +323,23 @@ class _DirectionalHintOverlay extends PositionComponent {
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(
           tip.dx - ux * arrowSize - uy * arrowSize * 0.6,
-          tip.dy - uy * arrowSize + ux * arrowSize * 0.6)
+          tip.dy - uy * arrowSize + ux * arrowSize * 0.6,)
       ..lineTo(
           tip.dx - ux * arrowSize + uy * arrowSize * 0.6,
-          tip.dy - uy * arrowSize - ux * arrowSize * 0.6)
+          tip.dy - uy * arrowSize - ux * arrowSize * 0.6,)
       ..close();
     canvas.drawPath(
-        arrowPath, Paint()..color = color.withValues(alpha: 0.9 * opacity));
+        arrowPath, Paint()..color = color.withValues(alpha: 0.9 * opacity),);
   }
 
   void _drawStepMarker(Canvas canvas, GridCell cell, int step, Color color,
-      double opacity) {
+      double opacity,) {
     final center = _cellCenter(cell);
     final radius = cellSize * 0.22;
 
     // Background.
     canvas.drawCircle(
-        center, radius, Paint()..color = color.withValues(alpha: 0.3 * opacity));
+        center, radius, Paint()..color = color.withValues(alpha: 0.3 * opacity),);
     // Border.
     canvas.drawCircle(
       center,
@@ -384,7 +365,7 @@ class _DirectionalHintOverlay extends PositionComponent {
   }
 
   void _drawLabel(Canvas canvas, GridCell cell, String text, Color color,
-      double opacity) {
+      double opacity,) {
     final center = _cellCenter(cell);
     final labelY = center.dy - cellSize * 0.65;
 
@@ -410,13 +391,13 @@ class _DirectionalHintOverlay extends PositionComponent {
       const Radius.circular(6),
     );
     canvas.drawRRect(
-        pillRect, Paint()..color = color.withValues(alpha: 0.85 * opacity));
+        pillRect, Paint()..color = color.withValues(alpha: 0.85 * opacity),);
     tp.paint(canvas,
-        Offset(center.dx - tp.width / 2, labelY - tp.height / 2));
+        Offset(center.dx - tp.width / 2, labelY - tp.height / 2),);
   }
 
   void _drawDashedLine(
-      Canvas canvas, Offset start, Offset end, Color color, double phase) {
+      Canvas canvas, Offset start, Offset end, Color color, double phase,) {
     final dx = end.dx - start.dx;
     final dy = end.dy - start.dy;
     final distance = _sqrt(dx * dx + dy * dy);
@@ -468,118 +449,4 @@ class _DirectionalHintOverlay extends PositionComponent {
   }
 }
 
-// ─── Diverged Hint Overlay ────────────────────────────────────────────────────
-// Highlights the wrong cells the user must undo, with a red "X" and a
-// pulsing effect to clearly communicate "go back".
-
-class _DivergedHintOverlay extends PositionComponent {
-  final List<GridCell> wrongCells;
-  final double cellSize;
-  final Vector2 boardPosition;
-
-  double _elapsed = 0;
-
-  _DivergedHintOverlay({
-    required this.wrongCells,
-    required this.cellSize,
-    required this.boardPosition,
-  });
-
-  @override
-  Future<void> onLoad() async {
-    await super.onLoad();
-    position = boardPosition;
-    size = Vector2(cellSize * 20, cellSize * 20);
-    priority = 100;
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-    _elapsed += dt;
-  }
-
-  @override
-  void render(Canvas canvas) {
-    super.render(canvas);
-
-    const wrongColor = Color(0xFFEF4444); // Red
-    final pulse = 0.6 + 0.4 * ((_elapsed * 3.0).remainder(6.28)).abs().clamp(0.0, 1.0);
-
-    for (int i = 0; i < wrongCells.length; i++) {
-      final cell = wrongCells[i];
-      final center = Offset(
-        cell.x * cellSize + cellSize / 2,
-        cell.y * cellSize + cellSize / 2,
-      );
-      final rect = Rect.fromCenter(
-          center: center, width: cellSize * 0.85, height: cellSize * 0.85);
-
-      // Red overlay.
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-        Paint()..color = wrongColor.withValues(alpha: 0.3 * pulse),
-      );
-      // Red border.
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(6)),
-        Paint()
-          ..color = wrongColor.withValues(alpha: 0.7 * pulse)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0,
-      );
-
-      // "✕" cross.
-      final crossSize = cellSize * 0.15;
-      final crossPaint = Paint()
-        ..color = wrongColor.withValues(alpha: 0.9 * pulse)
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round;
-      canvas.drawLine(
-        Offset(center.dx - crossSize, center.dy - crossSize),
-        Offset(center.dx + crossSize, center.dy + crossSize),
-        crossPaint,
-      );
-      canvas.drawLine(
-        Offset(center.dx + crossSize, center.dy - crossSize),
-        Offset(center.dx - crossSize, center.dy + crossSize),
-        crossPaint,
-      );
-    }
-
-    // "Go back" label above the first wrong cell.
-    if (wrongCells.isNotEmpty) {
-      final firstCenter = Offset(
-        wrongCells.first.x * cellSize + cellSize / 2,
-        wrongCells.first.y * cellSize + cellSize / 2,
-      );
-      final labelY = firstCenter.dy - cellSize * 0.65;
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: '← Go back',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.95),
-            fontSize: cellSize * 0.2,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-      final pillRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(firstCenter.dx, labelY),
-          width: tp.width + 16,
-          height: tp.height + 8,
-        ),
-        const Radius.circular(6),
-      );
-      canvas.drawRRect(
-          pillRect, Paint()..color = wrongColor.withValues(alpha: 0.85));
-      tp.paint(canvas,
-          Offset(firstCenter.dx - tp.width / 2, labelY - tp.height / 2));
-    }
-  }
-}
 

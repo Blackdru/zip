@@ -1,7 +1,7 @@
 name: dots_app
 description: Dots - Connect colored dots puzzle game
 publish_to: 'none'
-version: 1.0.1+1
+version: 1.0.2+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -58,6 +58,18 @@ dev_dependencies:
   
   # Testing
   mockito: ^5.4.4
+  
+  # Icon generation
+  flutter_launcher_icons: ^0.13.1
+
+# Flutter Launcher Icons Configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#0F0A1E"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
 
 flutter:
   uses-material-design: true
@@ -66,3 +78,4 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/sounds/
+    - assets/zip/
